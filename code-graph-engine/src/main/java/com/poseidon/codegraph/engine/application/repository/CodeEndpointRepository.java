@@ -23,19 +23,24 @@ public interface CodeEndpointRepository {
     /**
      * 根据 ID 删除端点
      */
-    void deleteById(String id);
+    void deleteById(String projectName, String id);
     
     /**
      * 查询哪些端点已存在
      * @param ids 端点ID列表
      * @return 已存在的端点ID集合
      */
-    Set<String> findExistingEndpointsByIds(List<String> ids);
+    Set<String> findExistingEndpointsByIds(String projectName, List<String> ids);
     
     /**
      * 根据项目文件路径查找端点
      */
-    List<CodeEndpointDO> findEndpointsByProjectFilePath(String projectFilePath);
+    List<CodeEndpointDO> findEndpointsByProjectFilePath(String projectName, String projectFilePath);
+
+    /**
+     * 根据方向查找项目端点。
+     */
+    List<CodeEndpointDO> findEndpointsByDirection(String projectName, String direction);
     
     /**
      * 根据 matchIdentity 查找所有端点（可选指定 direction）
@@ -45,4 +50,3 @@ public interface CodeEndpointRepository {
      */
     List<CodeEndpointDO> findEndpointsByMatchIdentity(String matchIdentity, String direction);
 }
-

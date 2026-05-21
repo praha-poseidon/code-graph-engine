@@ -12,6 +12,7 @@ public class CodeFunctionDO {
     private String name;
     private String qualifiedName;
     private String language;
+    private String projectName;
     private String projectFilePath;
     private String gitRepoUrl;
     private String gitBranch;
@@ -25,4 +26,3 @@ public class CodeFunctionDO {
     private Boolean isConstructor;
     private Boolean isPlaceholder;
 }
-

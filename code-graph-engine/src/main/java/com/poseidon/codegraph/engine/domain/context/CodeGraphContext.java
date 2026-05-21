@@ -1,11 +1,11 @@
 package com.poseidon.codegraph.engine.domain.context;
 
-import com.poseidon.codegraph.engine.domain.model.event.ChangeType;
-import com.poseidon.codegraph.engine.domain.parser.enricher.GraphEnricher;
+import com.poseidon.codegraph.model.event.ChangeType;
+import com.poseidon.codegraph.spi.CodeGraphParserRegistry;
 import lombok.Data;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 代码图谱上下文（领域层交互核心对象）
@@ -13,7 +13,6 @@ import java.util.List;
  * 1. 变更数据（参数）
  * 2. 操作能力（Reader/Writer）
  * 3. 事件能力（Sender）
- * 4. 增强器（Enrichers）
  */
 @Data
 public class CodeGraphContext {
@@ -74,6 +73,34 @@ public class CodeGraphContext {
      * sourcepath 条目
      */
     private String[] sourcepathEntries;
+
+    /**
+     * 源码语言，用来选择对应的解析器 SPI。
+     */
+    private String language = "java";
+
+    /**
+     * 外部值字典。
+     *
+     * <p>例如 Spring application.yml/properties 会被扫描成 namespace=config 的字典，
+     * static-extract trace 规则可以通过 namespace + lookup 读取这些值。
+     */
+    private Map<String, Map<String, List<String>>> externalValues;
+
+    /**
+     * 外部传入的 endpoint SER 规则文本。
+     */
+    private List<String> endpointRuleSources;
+
+    /**
+     * 外部传入的 trace SER 规则文本。
+     */
+    private List<String> traceRuleSources;
+
+    /**
+     * 解析器注册表。
+     */
+    private CodeGraphParserRegistry parserRegistry;
     
     /**
      * 旧文件项目路径
@@ -89,11 +116,6 @@ public class CodeGraphContext {
      * 变更类型
      */
     private ChangeType changeType;
-    
-    /**
-     * 图谱增强器列表（用于端点解析等扩展功能）
-     */
-    private List<GraphEnricher> enrichers = new ArrayList<>();
     
     // ========== 操作能力 ==========
     
@@ -118,4 +140,3 @@ public class CodeGraphContext {
         this.sender = new GraphSender();
     }
 }
-

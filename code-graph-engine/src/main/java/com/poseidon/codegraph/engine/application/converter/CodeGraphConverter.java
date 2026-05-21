@@ -1,8 +1,8 @@
 package com.poseidon.codegraph.engine.application.converter;
 
 import com.poseidon.codegraph.engine.application.model.*;
-import com.poseidon.codegraph.engine.domain.model.*;
-import com.poseidon.codegraph.engine.domain.model.endpoint.*;
+import com.poseidon.codegraph.model.*;
+import com.poseidon.codegraph.model.endpoint.*;
 
 /**
  * 代码图谱转换器
@@ -20,6 +20,7 @@ public class CodeGraphConverter {
         domain.setName(dobj.getName());
         domain.setQualifiedName(dobj.getQualifiedName());
         domain.setLanguage(dobj.getLanguage());
+        domain.setProjectName(dobj.getProjectName());
         domain.setProjectFilePath(dobj.getProjectFilePath());
         domain.setPackagePath(dobj.getPackagePath());
         return domain;
@@ -33,7 +34,10 @@ public class CodeGraphConverter {
         domain.setName(dobj.getName());
         domain.setQualifiedName(dobj.getQualifiedName());
         domain.setLanguage(dobj.getLanguage());
+        domain.setProjectName(dobj.getProjectName());
         domain.setProjectFilePath(dobj.getProjectFilePath());
+        domain.setGitRepoUrl(dobj.getGitRepoUrl());
+        domain.setGitBranch(dobj.getGitBranch());
         domain.setStartLine(dobj.getStartLine());
         domain.setEndLine(dobj.getEndLine());
         domain.setUnitType(dobj.getUnitType());
@@ -51,7 +55,10 @@ public class CodeGraphConverter {
         domain.setName(dobj.getName());
         domain.setQualifiedName(dobj.getQualifiedName());
         domain.setLanguage(dobj.getLanguage());
+        domain.setProjectName(dobj.getProjectName());
         domain.setProjectFilePath(dobj.getProjectFilePath());
+        domain.setGitRepoUrl(dobj.getGitRepoUrl());
+        domain.setGitBranch(dobj.getGitBranch());
         domain.setStartLine(dobj.getStartLine());
         domain.setEndLine(dobj.getEndLine());
         domain.setSignature(dobj.getSignature());
@@ -80,6 +87,7 @@ public class CodeGraphConverter {
         domain.setLineNumber(dobj.getLineNumber());
         domain.setCallType(dobj.getCallType());
         domain.setLanguage(dobj.getLanguage());
+        domain.setProjectName(dobj.getProjectName());
         return domain;
     }
     
@@ -141,6 +149,7 @@ public class CodeGraphConverter {
         domain.setGitRepoUrl(dobj.getGitRepoUrl());
         domain.setGitBranch(dobj.getGitBranch());
         domain.setLanguage(dobj.getLanguage());
+        domain.setProjectName(dobj.getProjectName());
         domain.setStartLine(dobj.getStartLine());
         domain.setEndLine(dobj.getEndLine());
         domain.setDirection(dobj.getDirection());
@@ -163,6 +172,7 @@ public class CodeGraphConverter {
         dobj.setName(domain.getName());
         dobj.setQualifiedName(domain.getQualifiedName());
         dobj.setLanguage(domain.getLanguage());
+        dobj.setProjectName(domain.getProjectName());
         dobj.setProjectFilePath(domain.getProjectFilePath());
         dobj.setPackagePath(domain.getPackagePath());
         return dobj;
@@ -176,7 +186,10 @@ public class CodeGraphConverter {
         dobj.setName(domain.getName());
         dobj.setQualifiedName(domain.getQualifiedName());
         dobj.setLanguage(domain.getLanguage());
+        dobj.setProjectName(domain.getProjectName());
         dobj.setProjectFilePath(domain.getProjectFilePath());
+        dobj.setGitRepoUrl(domain.getGitRepoUrl());
+        dobj.setGitBranch(domain.getGitBranch());
         dobj.setStartLine(domain.getStartLine());
         dobj.setEndLine(domain.getEndLine());
         dobj.setUnitType(domain.getUnitType());
@@ -194,7 +207,10 @@ public class CodeGraphConverter {
         dobj.setName(domain.getName());
         dobj.setQualifiedName(domain.getQualifiedName());
         dobj.setLanguage(domain.getLanguage());
+        dobj.setProjectName(domain.getProjectName());
         dobj.setProjectFilePath(domain.getProjectFilePath());
+        dobj.setGitRepoUrl(domain.getGitRepoUrl());
+        dobj.setGitBranch(domain.getGitBranch());
         dobj.setStartLine(domain.getStartLine());
         dobj.setEndLine(domain.getEndLine());
         dobj.setSignature(domain.getSignature());
@@ -223,6 +239,7 @@ public class CodeGraphConverter {
         dobj.setLineNumber(domain.getLineNumber());
         dobj.setCallType(domain.getCallType());
         dobj.setLanguage(domain.getLanguage());
+        dobj.setProjectName(domain.getProjectName());
         return dobj;
     }
     
@@ -237,6 +254,7 @@ public class CodeGraphConverter {
         dobj.setGitRepoUrl(domain.getGitRepoUrl());
         dobj.setGitBranch(domain.getGitBranch());
         dobj.setLanguage(domain.getLanguage());
+        dobj.setProjectName(domain.getProjectName());
         dobj.setStartLine(domain.getStartLine());
         dobj.setEndLine(domain.getEndLine());
         

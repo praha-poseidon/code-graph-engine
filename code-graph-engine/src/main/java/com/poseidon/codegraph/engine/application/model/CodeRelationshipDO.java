@@ -39,5 +39,9 @@ public class CodeRelationshipDO {
      * 语言
      */
     private String language;
-}
 
+    /**
+     * 所属项目名称。
+     */
+    private String projectName;
+}

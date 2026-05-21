@@ -1,0 +1,2 @@
+builtin/spring-mvc-http-inbound.ser
+builtin/rest-template-http-outbound.ser

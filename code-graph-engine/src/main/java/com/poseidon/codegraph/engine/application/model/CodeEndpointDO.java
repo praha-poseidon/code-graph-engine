@@ -16,6 +16,7 @@ public class CodeEndpointDO {
     private String gitRepoUrl;
     private String gitBranch;
     private String language;
+    private String projectName;
     private Integer startLine;
     private Integer endLine;
     
@@ -49,4 +50,3 @@ public class CodeEndpointDO {
     private String targetService;
     private String matchIdentity;
 }
-

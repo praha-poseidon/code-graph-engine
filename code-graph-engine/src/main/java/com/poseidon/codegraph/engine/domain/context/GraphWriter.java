@@ -1,10 +1,10 @@
 package com.poseidon.codegraph.engine.domain.context;
 
-import com.poseidon.codegraph.engine.domain.model.CodeEndpoint;
-import com.poseidon.codegraph.engine.domain.model.CodeRelationship;
-import com.poseidon.codegraph.engine.domain.model.CodeFunction;
-import com.poseidon.codegraph.engine.domain.model.CodePackage;
-import com.poseidon.codegraph.engine.domain.model.CodeUnit;
+import com.poseidon.codegraph.model.CodeEndpoint;
+import com.poseidon.codegraph.model.CodeRelationship;
+import com.poseidon.codegraph.model.CodeFunction;
+import com.poseidon.codegraph.model.CodePackage;
+import com.poseidon.codegraph.model.CodeUnit;
 import lombok.Data;
 
 import java.util.function.Consumer;
@@ -29,6 +29,12 @@ public class GraphWriter {
      * Input: nodeId
      */
     private Consumer<String> deleteNode;
+
+    /**
+     * 删除关系
+     * Input: relationshipId
+     */
+    private Consumer<String> deleteRelationship;
     
     // ========== 批量插入函数 ==========
     

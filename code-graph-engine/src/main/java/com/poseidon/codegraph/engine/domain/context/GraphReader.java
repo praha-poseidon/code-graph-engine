@@ -1,8 +1,8 @@
 package com.poseidon.codegraph.engine.domain.context;
 
-import com.poseidon.codegraph.engine.domain.model.CodeFunction;
-import com.poseidon.codegraph.engine.domain.model.CodeUnit;
-import com.poseidon.codegraph.engine.domain.model.FileMetadata;
+import com.poseidon.codegraph.model.CodeFunction;
+import com.poseidon.codegraph.model.CodeUnit;
+import com.poseidon.codegraph.model.FileMetadata;
 import lombok.Data;
 
 import java.util.List;
@@ -44,6 +44,12 @@ public class GraphReader {
      * Input: List<qualifiedName> -> Output: Set<existingQualifiedName>
      */
     private Function<java.util.List<String>, java.util.Set<String>> findExistingFunctionsByQualifiedNames;
+
+    /**
+     * 批量查询函数详情
+     * Input: List<qualifiedName> -> Output: Map<qualifiedName, CodeFunction>
+     */
+    private Function<java.util.List<String>, java.util.Map<String, CodeFunction>> findFunctionsByQualifiedNames;
     
     /**
      * 批量查询单元是否存在
@@ -74,11 +80,11 @@ public class GraphReader {
      * 查找文件的所有端点
      * Input: projectFilePath -> Output: List<CodeEndpoint>
      */
-    private Function<String, java.util.List<com.poseidon.codegraph.engine.domain.model.CodeEndpoint>> findEndpointsByProjectFilePath;
+    private Function<String, java.util.List<com.poseidon.codegraph.model.CodeEndpoint>> findEndpointsByProjectFilePath;
     
     /**
      * 根据 matchIdentity 和 direction 查找端点
      * Input: (matchIdentity, direction) -> Output: List<CodeEndpoint>
      */
-    private java.util.function.BiFunction<String, String, java.util.List<com.poseidon.codegraph.engine.domain.model.CodeEndpoint>> findEndpointsByMatchIdentity;
+    private java.util.function.BiFunction<String, String, java.util.List<com.poseidon.codegraph.model.CodeEndpoint>> findEndpointsByMatchIdentity;
 }

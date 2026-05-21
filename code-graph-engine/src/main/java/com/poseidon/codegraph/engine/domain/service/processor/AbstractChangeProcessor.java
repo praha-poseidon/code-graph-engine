@@ -1,16 +1,22 @@
 package com.poseidon.codegraph.engine.domain.service.processor;
 
 import com.poseidon.codegraph.engine.domain.context.CodeGraphContext;
-import com.poseidon.codegraph.engine.domain.model.*;
-import com.poseidon.codegraph.engine.domain.model.event.ChangeType;
-import com.poseidon.codegraph.engine.domain.model.event.CodeChangeEvent;
-import com.poseidon.codegraph.engine.domain.parser.SourceCodeParser;
-import com.poseidon.codegraph.engine.domain.parser.JdtSourceCodeParser;
+import com.poseidon.codegraph.model.*;
+import com.poseidon.codegraph.model.delta.GraphDelta;
+import com.poseidon.codegraph.model.delta.ParseRequest;
+import com.poseidon.codegraph.model.event.ChangeType;
+import com.poseidon.codegraph.model.event.CodeChangeEvent;
+import com.poseidon.codegraph.engine.domain.service.delta.GraphDeltaProjectScopeNormalizer;
+import com.poseidon.codegraph.engine.domain.service.delta.GraphDeltaApplyService;
+import com.poseidon.codegraph.spi.CodeGraphParser;
+import com.poseidon.codegraph.spi.CodeGraphParserRegistry;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -20,327 +26,70 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public abstract class AbstractChangeProcessor implements CodeChangeProcessor {
+
+    private final GraphDeltaApplyService graphDeltaApplyService = new GraphDeltaApplyService();
+    private final GraphDeltaProjectScopeNormalizer projectScopeNormalizer = new GraphDeltaProjectScopeNormalizer();
     
     protected AbstractChangeProcessor() {
     }
     
-    /**
-     * 创建绑定的解析器
-     */
-    protected SourceCodeParser createParser(CodeGraphContext context) {
-        // 如果配置了增强器，传递给解析器
-        if (context.getEnrichers() != null && !context.getEnrichers().isEmpty()) {
-            return new JdtSourceCodeParser(
-                context.getClasspathEntries(),
-                context.getSourcepathEntries(),
-                context.getEnrichers()
-            );
-        } else {
-            return new JdtSourceCodeParser(
-                context.getClasspathEntries(),
-                context.getSourcepathEntries()
-            );
-        }
-    }
-    
-    protected CodeGraph parseFile(CodeGraphContext context, String absoluteFilePath, String projectFilePath) {
-        return createParser(context).parse(
-            absoluteFilePath, 
-            context.getProjectName(), 
-            projectFilePath,
+    protected GraphDelta parseGraphDelta(CodeGraphContext context, String absoluteFilePath, String projectFilePath) {
+        String language = context.getLanguage() == null || context.getLanguage().isBlank() ? "java" : context.getLanguage();
+        CodeGraphParser parser = parserRegistry(context)
+            .find(language)
+            .orElseThrow(() -> new IllegalStateException("No code graph parser registered for language: " + language));
+        ParseRequest request = new ParseRequest(
+            context.getProjectName(),
+            language,
+            projectRoot(absoluteFilePath, projectFilePath),
+            List.of(absoluteFilePath),
+            toList(context.getSourcepathEntries()),
+            toList(context.getClasspathEntries()),
             context.getGitRepoUrl(),
-            context.getGitBranch()
+            context.getGitBranch(),
+            context.getChangeType(),
+            context.getEndpointRuleSources(),
+            context.getTraceRuleSources(),
+            context.getExternalValues(),
+            Map.of("projectFilePath", projectFilePath)
         );
+        return projectScopeNormalizer.normalize(parser.parse(request), context.getProjectName());
+    }
+
+    private CodeGraphParserRegistry parserRegistry(CodeGraphContext context) {
+        if (context.getParserRegistry() != null) {
+            return context.getParserRegistry();
+        }
+        return CodeGraphParserRegistry.loadFromServiceLoader();
+    }
+
+    private List<String> toList(String[] values) {
+        return values == null ? List.of() : Arrays.stream(values).filter(v -> v != null && !v.isBlank()).toList();
+    }
+
+    private String projectRoot(String absoluteFilePath, String projectFilePath) {
+        if (absoluteFilePath == null || projectFilePath == null || projectFilePath.isBlank()) {
+            return null;
+        }
+        String normalizedAbsolute = absoluteFilePath.replace('\\', '/');
+        String normalizedProject = projectFilePath.replace('\\', '/');
+        if (normalizedAbsolute.endsWith(normalizedProject)) {
+            return normalizedAbsolute.substring(0, normalizedAbsolute.length() - normalizedProject.length())
+                .replaceAll("/$", "");
+        }
+        return null;
+    }
+
+    private <T> List<T> safeList(List<T> values) {
+        return values == null ? List.of() : values;
     }
     
-    protected void saveNodes(CodeGraph graph, CodeGraphContext context) {
-        // 批量保存：先查询是否存在，存在则更新，不存在则插入
-        
-        // 1. 处理 Packages
-        java.util.List<CodePackage> packages = graph.getPackagesAsList();
-        if (!packages.isEmpty()) {
-            savePackagesWithCheck(packages, context);
-        }
-        
-        // 2. 处理 Units
-        java.util.List<CodeUnit> units = graph.getUnitsAsList();
-        if (!units.isEmpty()) {
-            saveUnitsWithCheck(units, context);
-        }
-        
-        // 3. 处理 Functions
-        java.util.List<CodeFunction> functions = graph.getFunctionsAsList();
-        if (!functions.isEmpty()) {
-            saveFunctionsWithCheck(functions, context);
-        }
-        
-        // 4. 处理 Endpoints（端点）
-        java.util.List<CodeEndpoint> endpoints = graph.getEndpointsAsList();
-        if (!endpoints.isEmpty()) {
-            saveEndpointsWithCheck(endpoints, context);
-            // 保存端点后，尝试创建 MATCHES 关系
-            createEndpointMatchRelationships(endpoints, context);
-        }
-        
-        // 5. 处理结构关系（BELONGS_TO 和端点关系）
-        java.util.List<CodeRelationship> allRelationships = graph.getRelationshipsAsList();
-        java.util.List<CodeRelationship> structureRelationships = allRelationships.stream()
-            .filter(rel -> rel.getRelationshipType() == RelationshipType.PACKAGE_TO_UNIT 
-                       || rel.getRelationshipType() == RelationshipType.UNIT_TO_FUNCTION
-                       || rel.getRelationshipType() == RelationshipType.ENDPOINT_TO_FUNCTION
-                       || rel.getRelationshipType() == RelationshipType.FUNCTION_TO_ENDPOINT)
-            .collect(java.util.stream.Collectors.toList());
-        
-        if (!structureRelationships.isEmpty()) {
-            saveStructureRelationshipsWithCheck(structureRelationships, context);
-        }
-    }
-    
-    /**
-     * 批量保存包：先查询存在性，然后分离插入/更新
-     */
-    private void savePackagesWithCheck(java.util.List<CodePackage> packages, CodeGraphContext context) {
-        // 查询哪些包已存在
-        java.util.List<String> packageIds = packages.stream()
-            .map(CodePackage::getId)
-            .collect(java.util.stream.Collectors.toList());
-        java.util.Set<String> existingIds = context.getReader()
-            .getFindExistingPackagesByQualifiedNames()
-            .apply(packageIds);
-        
-        // 分离需要插入和更新的包
-        java.util.List<CodePackage> toInsert = new java.util.ArrayList<>();
-        java.util.List<CodePackage> toUpdate = new java.util.ArrayList<>();
-        
-        for (CodePackage pkg : packages) {
-            if (existingIds.contains(pkg.getId())) {
-                toUpdate.add(pkg);
-            } else {
-                toInsert.add(pkg);
-            }
-        }
-        
-        // 批量插入和更新
-        if (!toInsert.isEmpty()) {
-            context.getWriter().getInsertPackagesBatch().accept(toInsert);
-        }
-        if (!toUpdate.isEmpty()) {
-            context.getWriter().getUpdatePackagesBatch().accept(toUpdate);
-        }
-    }
-    
-    /**
-     * 批量保存单元：先查询存在性，然后分离插入/更新
-     */
-    private void saveUnitsWithCheck(java.util.List<CodeUnit> units, CodeGraphContext context) {
-        // 查询哪些单元已存在
-        java.util.List<String> unitIds = units.stream()
-            .map(CodeUnit::getId)
-            .collect(java.util.stream.Collectors.toList());
-        java.util.Set<String> existingIds = context.getReader()
-            .getFindExistingUnitsByQualifiedNames()
-            .apply(unitIds);
-        
-        // 分离需要插入和更新的单元
-        java.util.List<CodeUnit> toInsert = new java.util.ArrayList<>();
-        java.util.List<CodeUnit> toUpdate = new java.util.ArrayList<>();
-        
-        for (CodeUnit unit : units) {
-            if (existingIds.contains(unit.getId())) {
-                toUpdate.add(unit);
-            } else {
-                toInsert.add(unit);
-            }
-        }
-        
-        // 批量插入和更新
-        if (!toInsert.isEmpty()) {
-            context.getWriter().getInsertUnitsBatch().accept(toInsert);
-        }
-        if (!toUpdate.isEmpty()) {
-            context.getWriter().getUpdateUnitsBatch().accept(toUpdate);
-        }
-    }
-    
-    /**
-     * 批量保存函数：先查询存在性，然后分离插入/更新
-     */
-    private void saveFunctionsWithCheck(java.util.List<CodeFunction> functions, CodeGraphContext context) {
-        // 查询哪些函数已存在
-        java.util.List<String> functionIds = functions.stream()
-            .map(CodeFunction::getId)
-            .collect(java.util.stream.Collectors.toList());
-        java.util.Set<String> existingIds = context.getReader()
-            .getFindExistingFunctionsByQualifiedNames()
-            .apply(functionIds);
-        
-        // 分离需要插入和更新的函数
-        java.util.List<CodeFunction> toInsert = new java.util.ArrayList<>();
-        java.util.List<CodeFunction> toUpdate = new java.util.ArrayList<>();
-        
-        for (CodeFunction func : functions) {
-            if (existingIds.contains(func.getId())) {
-                toUpdate.add(func);
-            } else {
-                toInsert.add(func);
-            }
-        }
-        
-        // 批量插入和更新
-        if (!toInsert.isEmpty()) {
-            context.getWriter().getInsertFunctionsBatch().accept(toInsert);
-        }
-        if (!toUpdate.isEmpty()) {
-            context.getWriter().getUpdateFunctionsBatch().accept(toUpdate);
-        }
-    }
-    
-    /**
-     * 创建端点匹配关系（MATCHES）
-     * 
-     * 策略：
-     * - 只在两端都存在时才创建关系
-     * - 不创建 placeholder 端点
-     * - 双向关系：outbound ↔ inbound
-     */
-    private void createEndpointMatchRelationships(java.util.List<CodeEndpoint> endpoints, CodeGraphContext context) {
-        if (endpoints.isEmpty()) {
-            return;
-        }
-        
-        log.info("开始创建端点匹配关系，共 {} 个端点", endpoints.size());
-        
-        java.util.List<CodeRelationship> matchRelationships = new java.util.ArrayList<>();
-        
-        for (CodeEndpoint endpoint : endpoints) {
-            // 只处理有 matchIdentity 的端点
-            if (endpoint.getMatchIdentity() == null || endpoint.getMatchIdentity().isEmpty()) {
-                log.debug("端点没有 matchIdentity，跳过: {}", endpoint.getId());
-                continue;
-            }
-            
-            // 根据方向查找匹配的对端
-            String targetDirection = "inbound".equals(endpoint.getDirection()) ? "outbound" : "inbound";
-            
-            // 查询数据库中所有匹配的对端端点
-            java.util.List<CodeEndpoint> matchingEndpoints = context.getReader()
-                .getFindEndpointsByMatchIdentity()
-                .apply(endpoint.getMatchIdentity(), targetDirection);
-            
-            log.debug("端点 {} ({}) 找到 {} 个匹配的 {} 端点",
-                endpoint.getName(), endpoint.getDirection(), 
-                matchingEndpoints.size(), targetDirection);
-            
-            // 为每个匹配的对端创建 MATCHES 关系
-            for (CodeEndpoint matchingEndpoint : matchingEndpoints) {
-                CodeRelationship rel = new CodeRelationship();
-                rel.setId(java.util.UUID.randomUUID().toString());
-                rel.setRelationshipType(RelationshipType.MATCHES);
-                
-                // 关系方向：outbound -> inbound (为了查询方便)
-                if ("outbound".equals(endpoint.getDirection())) {
-                    rel.setFromNodeId(endpoint.getId());
-                    rel.setToNodeId(matchingEndpoint.getId());
-                } else {
-                    rel.setFromNodeId(matchingEndpoint.getId());
-                    rel.setToNodeId(endpoint.getId());
-                }
-                
-                rel.setLanguage("java");
-                matchRelationships.add(rel);
-                
-                log.debug("创建 MATCHES 关系: {} ({}) -> {} ({})",
-                    endpoint.getName(), endpoint.getDirection(),
-                    matchingEndpoint.getName(), matchingEndpoint.getDirection());
-            }
-        }
-        
-        // 批量保存 MATCHES 关系
-        if (!matchRelationships.isEmpty()) {
-            context.getWriter().getInsertRelationshipsBatch().accept(matchRelationships);
-            log.info("✓ 端点匹配关系创建完成: 共创建 {} 个 MATCHES 关系", matchRelationships.size());
-        } else {
-            log.info("✓ 没有匹配的端点，无需创建 MATCHES 关系");
-        }
-    }
-    
-    /**
-     * 批量保存端点：先去重，再查询存在性，最后只插入新端点
-     * 注意：端点属性稳定，不需要更新已存在的端点
-     */
-    private void saveEndpointsWithCheck(java.util.List<CodeEndpoint> endpoints, CodeGraphContext context) {
-        // 1. 先按 ID 去重（同一次解析中，相同 ID 的端点只保留第一个）
-        java.util.Map<String, CodeEndpoint> uniqueEndpoints = new java.util.LinkedHashMap<>();
-        for (CodeEndpoint endpoint : endpoints) {
-            uniqueEndpoints.putIfAbsent(endpoint.getId(), endpoint);
-        }
-        
-        java.util.List<CodeEndpoint> deduplicatedEndpoints = new java.util.ArrayList<>(uniqueEndpoints.values());
-        
-        log.info("端点去重：原始 {} 个，去重后 {} 个", 
-            endpoints.size(), deduplicatedEndpoints.size());
-        
-        // 2. 查询哪些端点已在数据库中存在
-        java.util.List<String> endpointIds = deduplicatedEndpoints.stream()
-            .map(CodeEndpoint::getId)
-            .collect(java.util.stream.Collectors.toList());
-        
-        java.util.Set<String> existingIds = context.getReader()
-            .getFindExistingEndpointsByIds()
-            .apply(endpointIds);
-        
-        // 3. 只插入不存在的端点（跳过已存在的）
-        java.util.List<CodeEndpoint> toInsert = deduplicatedEndpoints.stream()
-            .filter(e -> !existingIds.contains(e.getId()))
-            .collect(java.util.stream.Collectors.toList());
-        
-        // 批量插入新端点
-        if (!toInsert.isEmpty()) {
-            context.getWriter().getInsertEndpointsBatch().accept(toInsert);
-        }
-        
-        log.info("端点保存完成：去重后 {} 个，新插入 {} 个，已存在 {} 个（跳过）",
-            deduplicatedEndpoints.size(), toInsert.size(), existingIds.size());
-    }
-    
-    /**
-     * 批量保存结构关系：先查询存在性，再分离插入
-     */
-    private void saveStructureRelationshipsWithCheck(java.util.List<CodeRelationship> relationships, CodeGraphContext context) {
-        if (relationships.isEmpty()) {
-            return;
-        }
-        
-        // 查询哪些结构关系已存在
-        java.util.List<com.poseidon.codegraph.engine.application.model.CodeRelationshipDO> relationshipDOs = relationships.stream()
-            .map(com.poseidon.codegraph.engine.application.converter.CodeGraphConverter::toDO)
-            .collect(java.util.stream.Collectors.toList());
-        
-        java.util.Set<String> existingKeys = context.getReader().getFindExistingStructureRelationships() != null
-            ? context.getReader().getFindExistingStructureRelationships().apply(relationshipDOs)
-            : new java.util.HashSet<>();
-        
-        // 分离需要插入的关系
-        java.util.List<CodeRelationship> toInsert = new java.util.ArrayList<>();
-        
-        for (CodeRelationship rel : relationships) {
-            String key = rel.getFromNodeId() + ":" + rel.getToNodeId() + ":" + rel.getRelationshipType();
-            if (!existingKeys.contains(key)) {
-                toInsert.add(rel);
-            }
-        }
-        
-        // 批量插入新关系（结构关系不需要更新，因为没有可变属性）
-        if (!toInsert.isEmpty()) {
-            context.getWriter().getInsertRelationshipsBatch().accept(toInsert);
-            log.info("批量插入结构关系: count={}", toInsert.size());
-        } else {
-            log.debug("所有结构关系已存在，跳过插入");
-        }
+    protected void saveNodes(GraphDelta delta, CodeGraphContext context) {
+        graphDeltaApplyService.apply(delta, context);
     }
     
     protected void deleteNodes(List<CodeUnit> units, List<CodeFunction> fileFunctions, 
-                            List<com.poseidon.codegraph.engine.domain.model.CodeEndpoint> endpoints,
+                            List<com.poseidon.codegraph.model.CodeEndpoint> endpoints,
                             CodeGraphContext context) {
         units.forEach(unit -> context.getWriter().getDeleteNode().accept(unit.getId()));
         fileFunctions.forEach(func -> context.getWriter().getDeleteNode().accept(func.getId()));
@@ -348,15 +97,15 @@ public abstract class AbstractChangeProcessor implements CodeChangeProcessor {
     }
     
     protected int rebuildFileCallRelationships(CodeGraphContext context, String absoluteFilePath, String projectFilePath,
-                                            CodeGraph graph) {
+                                            GraphDelta delta) {
         log.debug("开始重建调用关系: file={}", projectFilePath);
         
-        if (graph == null) {
-            log.debug("graph 为空，重新解析文件: {}", projectFilePath);
-            graph = parseFile(context, absoluteFilePath, projectFilePath);
+        if (delta == null) {
+            log.debug("delta 为空，重新解析文件: {}", projectFilePath);
+            delta = parseGraphDelta(context, absoluteFilePath, projectFilePath);
         }
         
-        java.util.List<CodeRelationship> relationships = graph.getRelationshipsAsList();
+        java.util.List<CodeRelationship> relationships = safeList(delta.relationships());
         // 只处理 CALLS 关系
         java.util.List<CodeRelationship> callRelationships = relationships.stream()
             .filter(rel -> rel.getRelationshipType() == RelationshipType.CALLS)
@@ -421,13 +170,14 @@ public abstract class AbstractChangeProcessor implements CodeChangeProcessor {
     private CodeFunction createPlaceholderFunction(String qualifiedName, String language) {
         CodeFunction placeholder = new CodeFunction();
         placeholder.setId(qualifiedName);
-        placeholder.setQualifiedName(qualifiedName);
+        String displayQualifiedName = displayQualifiedFunctionName(qualifiedName);
+        placeholder.setQualifiedName(displayQualifiedName);
         placeholder.setIsPlaceholder(true);
         placeholder.setLanguage(language);
         
         // 从 qualifiedName 中提取 name 和 signature
         // 格式：com.example.Class.method(params):returnType 或 com.example.Class.method(params)
-        String nameAndSignature = extractMethodNameAndSignature(qualifiedName);
+        String nameAndSignature = extractMethodNameAndSignature(displayQualifiedName);
         if (nameAndSignature != null) {
             // 如果包含参数，提取方法名
             int leftParen = nameAndSignature.indexOf('(');
@@ -441,6 +191,18 @@ public abstract class AbstractChangeProcessor implements CodeChangeProcessor {
         }
         
         return placeholder;
+    }
+
+    private String displayQualifiedFunctionName(String functionId) {
+        if (functionId == null || functionId.isBlank()) {
+            return functionId;
+        }
+        String raw = GraphIds.raw(null, functionId);
+        int scopedIndex = raw.indexOf(GraphIds.PROJECT_SEPARATOR);
+        if (scopedIndex >= 0) {
+            raw = raw.substring(scopedIndex + GraphIds.PROJECT_SEPARATOR.length());
+        }
+        return raw.startsWith("fn:") ? raw.substring("fn:".length()) : raw;
     }
     
     /**
@@ -478,6 +240,7 @@ public abstract class AbstractChangeProcessor implements CodeChangeProcessor {
         if (dependentFiles.isEmpty()) {
             return;
         }
+        String language = context.getLanguage() == null || context.getLanguage().isBlank() ? "java" : context.getLanguage();
         
         log.info("开始处理级联变更: dependentCount={}", dependentFiles.size());
         
@@ -509,7 +272,7 @@ public abstract class AbstractChangeProcessor implements CodeChangeProcessor {
                 event.setSourcepathEntries(context.getSourcepathEntries());
                 event.setOldFileIdentifier(fileMeta.getProjectFilePath());
                 event.setChangeType(ChangeType.CASCADE_UPDATE);
-                event.setLanguage("java");
+                event.setLanguage(language);
                 event.setTimestamp(LocalDateTime.now());
                 event.setReason("Cascade update from " + context.getOldProjectFilePath());
                 

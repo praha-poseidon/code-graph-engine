@@ -1,11 +1,12 @@
 package com.poseidon.codegraph.engine.domain.service.processor;
 
 import com.poseidon.codegraph.engine.domain.context.CodeGraphContext;
-import com.poseidon.codegraph.engine.domain.model.CodeFunction;
-import com.poseidon.codegraph.engine.domain.model.CodeUnit;
-import com.poseidon.codegraph.engine.domain.model.event.ChangeType;
+import com.poseidon.codegraph.model.CodeFunction;
+import com.poseidon.codegraph.model.CodeUnit;
+import com.poseidon.codegraph.model.event.ChangeType;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -25,19 +26,19 @@ public class RemovedSourceProcessor extends AbstractChangeProcessor {
         log.info("处理删除文件: {}", projectFilePath);
         
         // 步骤 1：查找谁依赖我
-        List<String> dependentFiles = context.getReader().getFindWhoCallsMe().apply(projectFilePath);
+        List<String> dependentFiles = new ArrayList<>(
+            context.getReader().getFindWhoCallsMe().apply(projectFilePath)
+        );
         
         // 排除自己，防止级联更新重新创建已被删除的节点（因为自引用导致 CascadeUpdateProcessor 重建本节点）
-        if (dependentFiles != null) {
-            dependentFiles.remove(projectFilePath);
-        }
+        dependentFiles.remove(projectFilePath);
         
         log.debug("找到依赖文件: {} 个", dependentFiles.size());
         
         // 步骤 2：查找该文件的所有节点
         List<CodeUnit> units = context.getReader().getFindUnitsByProjectFilePath().apply(projectFilePath);
         List<CodeFunction> fileFunctions = context.getReader().getFindFunctionsByProjectFilePath().apply(projectFilePath);
-        List<com.poseidon.codegraph.engine.domain.model.CodeEndpoint> endpoints = 
+        List<com.poseidon.codegraph.model.CodeEndpoint> endpoints = 
             context.getReader().getFindEndpointsByProjectFilePath().apply(projectFilePath);
         
         // 步骤 3：删除所有节点（会自动删除所有相关的边）

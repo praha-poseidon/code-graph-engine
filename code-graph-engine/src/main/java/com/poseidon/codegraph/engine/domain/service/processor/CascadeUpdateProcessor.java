@@ -1,7 +1,7 @@
 package com.poseidon.codegraph.engine.domain.service.processor;
 
 import com.poseidon.codegraph.engine.domain.context.CodeGraphContext;
-import com.poseidon.codegraph.engine.domain.model.event.ChangeType;
+import com.poseidon.codegraph.model.event.ChangeType;
 import lombok.extern.slf4j.Slf4j;
 
 /**

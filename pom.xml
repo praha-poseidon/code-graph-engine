@@ -20,13 +20,23 @@
 
   <properties>
     <java.version>21</java.version>
+    <java-static-extract.version>0.0.1-SNAPSHOT</java-static-extract.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
   </properties>
 
   <modules>
+    <module>code-graph-model</module>
+    <module>code-graph-spi</module>
+    <module>code-graph-parser-process</module>
+    <module>code-graph-parser-java-jdt</module>
     <module>code-graph-engine</module>
-    <module>code-graph-test</module>
+    <module>code-graph-storage-neo4j</module>
+    <module>code-graph-storage-memory</module>
+    <module>code-graph-storage-memgraph</module>
+    <module>code-graph-storage-apache-age</module>
+    <module>code-graph-spring-boot-starter</module>
+    <module>code-graph-app</module>
   </modules>
 
   <dependencyManagement>
@@ -52,5 +62,3 @@
     </pluginManagement>
   </build>
 </project>
-
-

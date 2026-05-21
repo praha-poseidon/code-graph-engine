@@ -15,7 +15,7 @@ public interface CodePackageRepository {
      * @param qualifiedNames 全限定名列表
      * @return 存在的全限定名集合
      */
-    Set<String> findExistingPackagesByQualifiedNames(List<String> qualifiedNames);
+    Set<String> findExistingPackagesByQualifiedNames(String projectName, List<String> qualifiedNames);
 
     /**
      * 批量插入包（纯数据库操作，不做存在性检查）
@@ -27,4 +27,3 @@ public interface CodePackageRepository {
      */
     void updatePackagesBatch(List<CodePackageDO> packages);
 }
-

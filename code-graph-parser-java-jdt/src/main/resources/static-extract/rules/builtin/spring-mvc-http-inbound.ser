@@ -1,0 +1,30 @@
+rule "Spring MVC HTTP Inbound"
+endpoint HTTP inbound
+
+find method with annotation @*Mapping
+
+let basePath =
+  from annotation on class @RequestMapping take attr(value)
+  from annotation on class @RequestMapping take attr(path)
+  default ""
+
+let methodPath =
+  from annotation on method @*Mapping take attr(value)
+  from annotation on method @*Mapping take attr(path)
+  default ""
+
+let httpMethod =
+  from annotation on method @*Mapping take name
+  map {
+    GetMapping: GET
+    PostMapping: POST
+    PutMapping: PUT
+    DeleteMapping: DELETE
+    PatchMapping: PATCH
+    RequestMapping: GET
+  }
+
+build {
+  httpMethod: httpMethod
+  path: concat(basePath, methodPath) | normalize slash | normalize pathVariable
+}

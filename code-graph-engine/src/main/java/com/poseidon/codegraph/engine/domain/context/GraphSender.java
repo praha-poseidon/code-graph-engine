@@ -1,6 +1,6 @@
 package com.poseidon.codegraph.engine.domain.context;
 
-import com.poseidon.codegraph.engine.domain.model.event.CodeChangeEvent;
+import com.poseidon.codegraph.model.event.CodeChangeEvent;
 import lombok.Data;
 import java.util.function.Consumer;
 

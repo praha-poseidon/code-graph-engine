@@ -1,0 +1,15 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: code-graph-app
+
+code-graph:
+  storage:
+    type: memory
+
+logging:
+  level:
+    com.poseidon.codegraph.parser.javajdt: DEBUG
+    com.poseidon.codegraph.engine.domain.service.processor: DEBUG

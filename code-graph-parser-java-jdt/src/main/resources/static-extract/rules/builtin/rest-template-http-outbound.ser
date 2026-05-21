@@ -1,0 +1,23 @@
+rule "RestTemplate HTTP Outbound"
+endpoint HTTP outbound
+
+find method RestTemplate.[getForObject,getForEntity,postForObject,postForEntity,put,delete]
+
+let rawUrl =
+  from argument[0] take value
+
+let httpMethod =
+  from method take name
+  map {
+    getForObject: GET
+    getForEntity: GET
+    postForObject: POST
+    postForEntity: POST
+    put: PUT
+    delete: DELETE
+  }
+
+build {
+  httpMethod: httpMethod
+  path: rawUrl | normalize extractPath | normalize pathVariable
+}

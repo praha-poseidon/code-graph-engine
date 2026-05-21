@@ -12,6 +12,7 @@ public class CodeUnitDO {
     private String name;
     private String qualifiedName;
     private String language;
+    private String projectName;
     private String projectFilePath;
     private String gitRepoUrl;
     private String gitBranch;
@@ -22,4 +23,3 @@ public class CodeUnitDO {
     private Boolean isAbstract;
     private String packageId;
 }
-
