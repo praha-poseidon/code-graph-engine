@@ -1,33 +1,70 @@
 # Code Graph
 
-Code Graph is a Java code graph engine. It parses source code into a common graph model, applies incremental updates, and writes the result through replaceable storage adapters.
+Code Graph is a pluggable code graph engine for turning source code into queryable graph data. It focuses on project-scale static analysis, incremental updates, endpoint extraction, and replaceable graph storage.
 
-Code Graph 是一个 Java 代码图谱引擎。它把源码解析成统一图模型，处理增量更新，并通过可替换的存储适配器写入图数据。
+Code Graph 是一个可插拔的代码图谱引擎，用来把源码转换成可查询、可存储、可增量更新的图数据。它重点解决项目级静态分析、增量更新、端点提取和图数据库适配问题。
 
-## What It Does
+## Why
 
-- Parses Java source with Eclipse JDT.
-- Builds packages, code units, functions, call relationships, inheritance relationships, implementation relationships, override relationships, and endpoints.
-- Applies file-level add, update, and delete changes into an existing graph.
-- Keeps storage replaceable through repository interfaces.
-- Supports memory, Neo4j, Memgraph, and Apache AGE storage modules.
-- Exposes a Spring Boot starter and a runnable app for local verification.
-- Allows external parsers for other languages through the parser SPI or process protocol.
+Most code intelligence products need the same foundation:
 
-## Modules
+- parse source code into stable graph nodes
+- connect classes, methods, calls, inheritance, implementation, overrides, and endpoints
+- update the graph when files change
+- write the result into a graph database
+- let different language parsers plug into the same graph engine
+
+Code Graph provides this foundation as an engine instead of a closed application.
+
+很多代码智能产品都需要同一套基础能力：
+
+- 把源码解析成稳定的图节点
+- 连接类、方法、调用、继承、实现、重写和端点
+- 文件变化后增量更新图谱
+- 写入不同图数据库
+- 让不同语言的解析器接入同一个图引擎
+
+Code Graph 提供的是这套基础引擎，而不是一个封闭应用。
+
+## What You Can Build With It
+
+- code understanding and dependency analysis
+- API endpoint inventory and endpoint matching
+- impact analysis for code changes
+- architecture visualization
+- code search and graph retrieval for agents
+- cross-service relationship analysis
+- custom static extraction pipelines
+
+## Current Capabilities
+
+- Java parsing based on Eclipse JDT.
+- Package, class, interface, enum, annotation, and method nodes.
+- Call relationships.
+- Inheritance, implementation, and override relationships.
+- Endpoint extraction through external SER rules.
+- File-level add, update, and delete handling.
+- Placeholder merge rules for external or unresolved nodes.
+- Common `GraphDelta` model for parser-to-engine integration.
+- Parser SPI for JVM parsers.
+- Process adapter for non-JVM language parsers.
+- Storage adapters for memory, Neo4j, Memgraph, and Apache AGE.
+- Spring Boot starter and runnable demo app.
+
+## Repository Structure
 
 | Module | Purpose |
 | --- | --- |
 | `code-graph-model` | Common graph model, endpoint model, delta model, and ID helpers. |
 | `code-graph-spi` | Parser extension interfaces and ServiceLoader registry. |
-| `code-graph-parser-java-jdt` | Java parser based on Eclipse JDT, including Java endpoint extraction through SER rules. |
-| `code-graph-parser-process` | Adapter for external language parsers running as local processes. |
+| `code-graph-parser-java-jdt` | Java parser based on Eclipse JDT, including endpoint extraction through SER rules. |
+| `code-graph-parser-process` | Adapter for external parsers running as local processes. |
 | `code-graph-engine` | Domain logic for graph merge, incremental update, placeholder handling, and cascade changes. |
 | `code-graph-storage-memory` | In-memory repository implementation for tests and local demos. |
 | `code-graph-storage-neo4j` | Neo4j repository implementation. |
 | `code-graph-storage-memgraph` | Memgraph storage module. |
 | `code-graph-storage-apache-age` | Apache AGE storage module for PostgreSQL graph extension. |
-| `code-graph-spring-boot-starter` | Spring Boot integration layer. It wires the engine, parser registry, and repositories. |
+| `code-graph-spring-boot-starter` | Spring Boot integration layer. |
 | `code-graph-app` | Runnable demo app with REST APIs. |
 
 ## Quick Start
@@ -37,19 +74,21 @@ Requirements:
 - JDK 21
 - Maven 3.9+
 
-Build and test:
+Clone and test:
 
 ```bash
+git clone https://github.com/praha-poseidon/code-graph.git
+cd code-graph
 mvn test
 ```
 
-Run the demo app with memory storage:
+Start the demo app with memory storage:
 
 ```bash
 mvn spring-boot:run -pl code-graph-app
 ```
 
-Health check:
+Check the service:
 
 ```bash
 curl http://localhost:8084/api/code-graph/health-check
@@ -76,18 +115,31 @@ curl -X POST http://localhost:8084/api/code-graph/files/nodes \
   }'
 ```
 
-`absoluteFilePath` is used to read the file from disk.
-`projectFilePath` is the path stored in graph nodes and should be relative to the project root.
-`sourcepathEntries` are source directories.
-`classpathEntries` are compiled class directories or dependency jars used by JDT type binding.
+The app currently returns whether the write succeeded. During local verification, parsing details are visible in logs. A small debug/query API is planned so users can inspect graph data directly after parsing.
+
+当前 App 会返回写入是否成功。做本地验证时，解析出的节点、关系和端点数量可以从日志中看到。后续会补一个轻量调试查询 API，让用户在解析后直接查看图数据。
+
+## Inputs Explained
+
+| Field | Meaning |
+| --- | --- |
+| `projectName` | Logical project name used for graph isolation. |
+| `absoluteFilePath` | Real local file path used to read source code. |
+| `projectFilePath` | Stable path relative to the project root, stored in graph data. |
+| `gitRepoUrl` | Repository URL stored as metadata. |
+| `gitBranch` | Branch name stored as metadata. |
+| `sourcepathEntries` | Source directories, usually `src/main/java`. |
+| `classpathEntries` | Compiled class directories and dependency jars used by JDT type binding. |
 
 Java parsing can still read syntax when classpath is incomplete, but type-accurate relationships need the project classes and dependency jars.
 
-## SER Rules
+## Endpoint Rules
 
-Endpoint extraction rules can be passed by the caller instead of being hard-coded in the engine. Use `serRuleSources` for new integrations. A single SER source string may contain endpoint extraction rules and trace rules together.
+Endpoint extraction is rule-driven. The caller can pass SER rule text directly through `serRuleSources`, so rules may come from a file, database, config service, or agent-generated output.
 
-Example request field:
+端点提取是规则驱动的。调用方可以通过 `serRuleSources` 直接传入 SER 规则文本，所以规则可以来自文件、数据库、配置中心，也可以由 Agent 生成。
+
+Example:
 
 ```json
 {
@@ -97,7 +149,7 @@ Example request field:
 }
 ```
 
-The parser maps built fields into endpoint properties. The graph engine itself does not decide which endpoint kinds are valid; it stores what the parser emits through the common model.
+The engine stores what the parser emits through the common model. It does not hard-code which endpoint kinds are valid.
 
 ## Storage
 
@@ -109,24 +161,32 @@ code-graph:
     type: memory
 ```
 
-Use another adapter by changing `code-graph.storage.type` and providing the database connection properties required by that module.
-
-Supported values in this repository:
+Supported storage types:
 
 - `memory`
 - `neo4j`
 - `memgraph`
 - `apache-age`
 
-## Parser Extension
+Use another adapter by changing `code-graph.storage.type` and providing the database connection properties required by that module.
+
+## Extending Parsers
 
 For a JVM parser, implement `CodeGraphParser` and expose it through Java `ServiceLoader`.
 
-For a non-JVM parser, use `code-graph-parser-process`: the external process receives a parse request and returns `GraphDelta` data. The engine only consumes the common delta model, so other languages do not need to depend on JDT.
+For a non-JVM parser, use `code-graph-parser-process`: the external process receives a parse request and returns `GraphDelta` data. The engine consumes the common delta model, so other languages do not need to depend on JDT.
 
-## Current Boundary
+## Project Boundary
 
-This repository is the engine layer. It does not include the UI, wiki generation, RAG workflows, or product-specific orchestration. Those can be built on top of this engine by calling the starter or app API.
+This repository is the engine layer. It does not include UI, wiki generation, RAG workflows, or product-specific orchestration. Those can be built on top of this engine through the starter or app API.
+
+## Roadmap
+
+- Debug APIs for reading parsed graph data from memory storage.
+- More ready-to-use SER examples.
+- Better documentation for custom parser authors.
+- More end-to-end examples with Neo4j and Apache AGE.
+- Packaging for easier local installation.
 
 ## License
 
