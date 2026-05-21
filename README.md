@@ -92,7 +92,7 @@ Example request field:
 ```json
 {
   "serRuleSources": [
-    "rule spring mvc inbound\nfrom method\nwhen annotation @GetMapping on method\nlet path = from annotation on method @GetMapping take attr(value)\nbuild {\n  kind: \"http\"\n  direction: \"inbound\"\n  method: \"GET\"\n  path: path\n}\n\ntrace spring value\nfrom field\nwhen annotation @Value on field\nlet rawValue = from annotation on field @Value take attr(value)\nbuild {\n  namespace: \"config\"\n  key: rawValue | normalize placeholderKey\n  default: rawValue | normalize placeholderDefault\n}"
+    "rule \"Custom HTTP Inbound\"\nendpoint HTTP inbound\n\nfind method with annotation @RouteGet\n\nlet httpMethod =\n  from literal GET take value\n\nlet path =\n  from annotation on method @RouteGet take attr(value)\n\nbuild {\n  httpMethod: httpMethod\n  path: path | normalize slash | normalize pathVariable\n}\n\ntrace \"Spring Value\"\nfrom field\nwhen annotation @Value on field\n\nlet rawValue =\n  from annotation on field @Value take attr(value)\n\nbuild {\n  namespace: \"config\"\n  key: rawValue | normalize placeholderKey\n  default: rawValue | normalize placeholderDefault\n}"
   ]
 }
 ```
