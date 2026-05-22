@@ -133,6 +133,56 @@ The app currently returns whether the write succeeded. During local verification
 
 Java parsing can still read syntax when classpath is incomplete, but type-accurate relationships need the project classes and dependency jars.
 
+## Frontend Parser Integration
+
+Code Graph can also consume a frontend parser through `code-graph-parser-process`. The frontend parser runs as a local CLI, receives `ParseRequest` on stdin, returns `GraphDelta` on stdout, and the Java engine writes that delta through the same storage pipeline.
+
+Code Graph 也可以通过 `code-graph-parser-process` 接入前端解析器。前端解析器作为本地 CLI 运行，从标准输入接收 `ParseRequest`，从标准输出返回 `GraphDelta`，Java engine 再通过同一套存储链路写入图谱。
+
+Build the frontend parser:
+
+构建前端解析器：
+
+```bash
+cd /path/to/frontend-code-graph-engine
+npm install
+npm run build
+```
+
+Start the app with the TypeScript process parser enabled:
+
+启动 app，并启用 TypeScript 外部进程解析器：
+
+```bash
+mvn spring-boot:run -pl code-graph-app \
+  -Dcodegraph.parser.process.languages=typescript \
+  -Dcodegraph.parser.process.typescript.command="node '/path/to/frontend-code-graph-engine/dist/cli.js' --stdio"
+```
+
+Then parse a `.tsx` or `.ts` file through the normal app API:
+
+然后通过普通 app API 解析 `.tsx` 或 `.ts` 文件：
+
+```bash
+curl -X POST http://localhost:8084/api/code-graph/files/nodes \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "projectName": "frontend-demo",
+    "absoluteFilePath": "/absolute/path/to/react-app/src/pages/UserPage.tsx",
+    "projectFilePath": "src/pages/UserPage.tsx",
+    "gitRepoUrl": "https://github.com/example/react-app.git",
+    "gitBranch": "main",
+    "sourcepathEntries": [
+      "/absolute/path/to/react-app/src"
+    ],
+    "classpathEntries": []
+  }'
+```
+
+The app infers `typescript` from `.ts` and `.tsx`, calls the configured CLI, and stores frontend modules, functions, outbound HTTP endpoints, imports, render relationships, hook usage, and calls.
+
+App 会根据 `.ts` 和 `.tsx` 推断语言为 `typescript`，调用已配置的 CLI，并写入前端模块、函数、出站 HTTP 端点、导入关系、组件渲染关系、Hook 使用关系和调用关系。
+
 ## Endpoint Rules
 
 Endpoint extraction is rule-driven. The caller can pass SER rule text directly through `serRuleSources`, so rules may come from a file, database, config service, or agent-generated output.

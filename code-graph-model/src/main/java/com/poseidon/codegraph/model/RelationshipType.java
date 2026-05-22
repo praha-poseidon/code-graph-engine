@@ -21,6 +21,21 @@ public enum RelationshipType {
     UNIT_TO_FUNCTION("CodeUnit", "CodeFunction"),
 
     /**
+     * 模块包含前端组件或其它代码单元。
+     */
+    MODULE_TO_UNIT("CodeUnit", "CodeUnit"),
+
+    /**
+     * 模块导入另一个模块或外部依赖。
+     */
+    IMPORTS("CodeUnit", "CodeUnit"),
+
+    /**
+     * 模块导出另一个模块或代码单元。
+     */
+    EXPORTS("CodeUnit", "CodeUnit"),
+
+    /**
      * 单元继承单元（class extends class、interface extends interface）
      */
     EXTENDS("CodeUnit", "CodeUnit"),
@@ -34,6 +49,31 @@ public enum RelationshipType {
      * 函数重写父类或接口函数
      */
     OVERRIDES("CodeFunction", "CodeFunction"),
+
+    /**
+     * 前端组件渲染另一个组件。
+     */
+    RENDERS("CodeUnit", "CodeUnit"),
+
+    /**
+     * 函数或组件使用 Hook。
+     */
+    USES_HOOK("CodeFunction", "CodeFunction"),
+
+    /**
+     * 函数或组件使用状态。
+     */
+    USES_STATE("CodeFunction", "CodeFunction"),
+
+    /**
+     * 函数处理事件。
+     */
+    HANDLES_EVENT("CodeFunction", "CodeFunction"),
+
+    /**
+     * 前端路由指向页面或组件。
+     */
+    ROUTES_TO("CodeEndpoint", "CodeUnit"),
     
     /**
      * 端点到函数（入站端点，如 HTTP 请求进入某个 Controller 方法）

@@ -30,6 +30,15 @@ Enable one or more process parsers with JVM properties:
 -Dcodegraph.parser.process.timeoutSeconds=60
 ```
 
+For the frontend React parser:
+
+前端 React 解析器可以这样接入：
+
+```bash
+-Dcodegraph.parser.process.languages=typescript
+-Dcodegraph.parser.process.typescript.command="node '/path/to/frontend-code-graph-engine/dist/cli.js' --stdio"
+```
+
 The same configuration can be supplied with environment variables:
 
 也可以通过环境变量配置：
@@ -104,9 +113,9 @@ The process writes a `GraphDelta` to stdout:
 }
 ```
 
-`GraphDelta` is the storage write protocol. Every node and relationship must have a stable `id`, `language`, `projectFilePath`, and `projectName`. The process adapter will stamp `projectName` from `ParseRequest` when it is missing, but parser implementations should still treat it as part of the contract.
+`GraphDelta` is the storage write protocol. Every node and relationship must have a stable `id`, `language`, `projectFilePath`, and `projectName`. Parser node IDs should be stable inside one project and should not include `projectName`; the Java engine applies project scoping before writing storage. The process adapter will stamp `projectName` from `ParseRequest` when it is missing, but parser implementations should still treat it as part of the contract.
 
-`GraphDelta` 是写入存储的协议。每个节点和关系都必须有稳定的 `id`、`language`、`projectFilePath`、`projectName`。process adapter 会在缺失时用 `ParseRequest` 里的 `projectName` 补齐，但解析器实现仍然应该把它当成协议字段。
+`GraphDelta` 是写入存储的协议。每个节点和关系都必须有稳定的 `id`、`language`、`projectFilePath`、`projectName`。解析器输出的节点 ID 应该只在单个项目内稳定，不要把 `projectName` 拼进 ID；Java engine 会在写入前统一加项目 scope。process adapter 会在缺失时用 `ParseRequest` 里的 `projectName` 补齐，但解析器实现仍然应该把它当成协议字段。
 
 Relationship `id` is required. It should be deterministic for the tuple `(fromNodeId, relationshipType, toNodeId)`, so rerunning the same parser does not create duplicate relationships.
 

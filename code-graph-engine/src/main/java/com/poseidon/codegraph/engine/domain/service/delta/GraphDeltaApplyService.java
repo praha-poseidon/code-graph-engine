@@ -67,13 +67,8 @@ public class GraphDeltaApplyService {
         }
 
         List<CodeRelationship> structureRelationships = safeList(delta.relationships()).stream()
-            .filter(rel -> rel.getRelationshipType() == RelationshipType.PACKAGE_TO_UNIT
-                || rel.getRelationshipType() == RelationshipType.UNIT_TO_FUNCTION
-                || rel.getRelationshipType() == RelationshipType.EXTENDS
-                || rel.getRelationshipType() == RelationshipType.IMPLEMENTS
-                || rel.getRelationshipType() == RelationshipType.OVERRIDES
-                || rel.getRelationshipType() == RelationshipType.ENDPOINT_TO_FUNCTION
-                || rel.getRelationshipType() == RelationshipType.FUNCTION_TO_ENDPOINT)
+            .filter(rel -> rel.getRelationshipType() != RelationshipType.CALLS
+                && rel.getRelationshipType() != RelationshipType.MATCHES)
             .collect(Collectors.toList());
 
         if (!structureRelationships.isEmpty()) {

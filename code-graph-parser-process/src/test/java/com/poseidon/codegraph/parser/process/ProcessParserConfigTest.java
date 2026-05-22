@@ -59,6 +59,37 @@ class ProcessParserConfigTest {
     }
 
     @Test
+    void processParserReadsFrontendGraphDelta() {
+        String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        ProcessCodeGraphParser parser = new ProcessCodeGraphParser(
+            "typescript",
+            List.of(javaBin, "-cp", System.getProperty("java.class.path"), FrontendExternalParser.class.getName()),
+            Duration.ofSeconds(10)
+        );
+
+        var delta = parser.parse(new ParseRequest(
+            "frontend-demo",
+            "typescript",
+            "/repo",
+            List.of("/repo/src/pages/UserPage.tsx"),
+            List.of("/repo/src"),
+            List.of(),
+            "https://example.com/frontend-demo.git",
+            "main",
+            null,
+            List.of(),
+            List.of(),
+            Map.of(),
+            Map.of()
+        ));
+
+        assertEquals(2, delta.units().size());
+        assertEquals(1, delta.endpoints().size());
+        assertEquals("HTTP:GET:/api/users/{param}", delta.endpoints().get(0).getMatchIdentity());
+        assertEquals(com.poseidon.codegraph.model.RelationshipType.RENDERS, delta.relationships().get(1).getRelationshipType());
+    }
+
+    @Test
     void processParserReportsInvalidJsonAsProtocolFailure() {
         String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         ProcessCodeGraphParser parser = new ProcessCodeGraphParser(
@@ -216,6 +247,128 @@ class InvalidJsonExternalParser {
     public static void main(String[] args) throws Exception {
         System.in.readAllBytes();
         System.out.print("not json");
+    }
+}
+
+class FrontendExternalParser {
+
+    public static void main(String[] args) throws Exception {
+        System.in.readAllBytes();
+        System.out.print("""
+            {
+              "scope": {
+                "projectName": "frontend-demo",
+                "language": "typescript",
+                "gitRepoUrl": "https://example.com/frontend-demo.git",
+                "gitBranch": "main",
+                "projectRoot": "/repo",
+                "sourceFiles": ["/repo/src/pages/UserPage.tsx"],
+                "changeType": "SOURCE_MODIFIED",
+                "attributes": {}
+              },
+              "packages": [
+                {
+                  "id": "frontend-demo",
+                  "name": "frontend-demo",
+                  "qualifiedName": "frontend-demo",
+                  "language": "typescript",
+                  "projectName": "frontend-demo",
+                  "projectFilePath": ".",
+                  "packagePath": "."
+                }
+              ],
+              "units": [
+                {
+                  "id": "frontend-demo#src/pages/UserPage.tsx",
+                  "name": "UserPage.tsx",
+                  "qualifiedName": "frontend-demo#src/pages/UserPage.tsx",
+                  "language": "typescript",
+                  "projectName": "frontend-demo",
+                  "projectFilePath": "src/pages/UserPage.tsx",
+                  "unitType": "module",
+                  "modifiers": [],
+                  "packageId": "frontend-demo"
+                },
+                {
+                  "id": "frontend-demo#src/components/UserCard.tsx::UserCard",
+                  "name": "UserCard",
+                  "qualifiedName": "frontend-demo#src/components/UserCard.tsx::UserCard",
+                  "language": "typescript",
+                  "projectName": "frontend-demo",
+                  "projectFilePath": "src/components/UserCard.tsx",
+                  "unitType": "react_component",
+                  "modifiers": [],
+                  "packageId": "frontend-demo#src/components/UserCard.tsx"
+                }
+              ],
+              "functions": [
+                {
+                  "id": "frontend-demo#src/pages/UserPage.tsx::UserPage()",
+                  "name": "UserPage",
+                  "qualifiedName": "frontend-demo#src/pages/UserPage.tsx::UserPage()",
+                  "language": "typescript",
+                  "projectName": "frontend-demo",
+                  "projectFilePath": "src/pages/UserPage.tsx",
+                  "signature": "UserPage()",
+                  "returnType": "ReactElement",
+                  "modifiers": [],
+                  "isAsync": false,
+                  "isStatic": false,
+                  "isConstructor": false,
+                  "isPlaceholder": false
+                }
+              ],
+              "endpoints": [
+                {
+                  "endpointKind": "http",
+                  "id": "endpoint:outbound:HTTP:users",
+                  "name": "HTTP:GET:/api/users/{param}",
+                  "qualifiedName": "endpoint:outbound:HTTP:users",
+                  "language": "typescript",
+                  "projectName": "frontend-demo",
+                  "projectFilePath": "src/pages/UserPage.tsx",
+                  "endpointType": "HTTP",
+                  "direction": "outbound",
+                  "isExternal": true,
+                  "serviceName": "frontend-demo",
+                  "parseLevel": "full",
+                  "matchIdentity": "HTTP:GET:/api/users/{param}",
+                  "httpMethod": "GET",
+                  "path": "/api/users/1",
+                  "normalizedPath": "/api/users/{param}"
+                }
+              ],
+              "relationships": [
+                {
+                  "id": "rel:package-to-unit",
+                  "fromNodeId": "frontend-demo",
+                  "toNodeId": "frontend-demo#src/pages/UserPage.tsx",
+                  "relationshipType": "PACKAGE_TO_UNIT",
+                  "language": "typescript",
+                  "projectName": "frontend-demo"
+                },
+                {
+                  "id": "rel:renders",
+                  "fromNodeId": "frontend-demo#src/pages/UserPage.tsx",
+                  "toNodeId": "frontend-demo#src/components/UserCard.tsx::UserCard",
+                  "relationshipType": "RENDERS",
+                  "language": "typescript",
+                  "projectName": "frontend-demo"
+                },
+                {
+                  "id": "rel:function-to-endpoint",
+                  "fromNodeId": "frontend-demo#src/pages/UserPage.tsx::UserPage()",
+                  "toNodeId": "endpoint:outbound:HTTP:users",
+                  "relationshipType": "FUNCTION_TO_ENDPOINT",
+                  "language": "typescript",
+                  "projectName": "frontend-demo"
+                }
+              ],
+              "deletedNodeIds": [],
+              "deletedRelationshipIds": [],
+              "diagnostics": []
+            }
+            """);
     }
 }
 
