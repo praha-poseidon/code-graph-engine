@@ -42,6 +42,36 @@ public class InMemoryCodeGraphRepository implements
     private final Map<String, CodeEndpointDO> endpoints = new ConcurrentHashMap<>();
     private final Map<String, CodeRelationshipDO> relationships = new ConcurrentHashMap<>();
 
+    public List<CodePackageDO> findPackagesByProject(String projectName) {
+        return packages.values().stream()
+            .filter(pkg -> sameProject(projectName, pkg.getProjectName()))
+            .toList();
+    }
+
+    public List<CodeUnitDO> findUnitsByProject(String projectName) {
+        return units.values().stream()
+            .filter(unit -> sameProject(projectName, unit.getProjectName()))
+            .toList();
+    }
+
+    public List<CodeFunctionDO> findFunctionsByProject(String projectName) {
+        return functions.values().stream()
+            .filter(function -> sameProject(projectName, function.getProjectName()))
+            .toList();
+    }
+
+    public List<CodeEndpointDO> findEndpointsByProject(String projectName) {
+        return endpoints.values().stream()
+            .filter(endpoint -> sameProject(projectName, endpoint.getProjectName()))
+            .toList();
+    }
+
+    public List<CodeRelationshipDO> findRelationshipsByProject(String projectName) {
+        return relationships.values().stream()
+            .filter(relationship -> sameProject(projectName, relationship.getProjectName()))
+            .toList();
+    }
+
     @Override
     public Set<String> findExistingPackagesByQualifiedNames(String projectName, List<String> qualifiedNames) {
         return packages.values().stream()

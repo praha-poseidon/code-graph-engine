@@ -117,7 +117,22 @@ curl -X POST http://localhost:8084/api/code-graph/files/nodes \
 
 The app currently returns whether the write succeeded. During local verification, parsing details are visible in logs. A small debug/query API is planned so users can inspect graph data directly after parsing.
 
-当前 App 会返回写入是否成功。做本地验证时，解析出的节点、关系和端点数量可以从日志中看到。后续会补一个轻量调试查询 API，让用户在解析后直接查看图数据。
+当前 App 会返回写入是否成功。做本地验证时，解析出的节点、关系和端点数量可以从日志中看到。memory storage 模式下也提供了轻量调试查询 API，让用户在解析后直接查看图数据。
+
+Inspect parsed data when using memory storage:
+
+使用 memory storage 时查看解析结果：
+
+```bash
+curl http://localhost:8084/api/code-graph/debug/projects/my-project/graph
+curl http://localhost:8084/api/code-graph/debug/projects/my-project/nodes
+curl http://localhost:8084/api/code-graph/debug/projects/my-project/endpoints
+curl http://localhost:8084/api/code-graph/debug/projects/my-project/relationships
+```
+
+These debug APIs are only registered when the in-memory repository is active. Production graph databases should be queried through their own tooling or a product-level query API.
+
+这些调试 API 只会在内存仓库启用时注册。生产图数据库建议通过数据库自身工具或产品层查询 API 查看。
 
 ## Inputs Explained
 
@@ -232,7 +247,6 @@ This repository is the engine layer. It does not include UI, wiki generation, RA
 
 ## Roadmap
 
-- Debug APIs for reading parsed graph data from memory storage.
 - More ready-to-use SER examples.
 - Better documentation for custom parser authors.
 - More end-to-end examples with Neo4j and Apache AGE.
