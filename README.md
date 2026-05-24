@@ -159,7 +159,7 @@ Build the frontend parser:
 构建前端解析器：
 
 ```bash
-cd /path/to/code-graph-parser-frontend
+cd /path/to/code-graph-parser-js
 npm install
 npm run build
 ```
@@ -171,7 +171,7 @@ Start the app with the TypeScript process parser enabled:
 ```bash
 mvn spring-boot:run -pl code-graph-app \
   -Dcodegraph.parser.process.languages=typescript \
-  -Dcodegraph.parser.process.typescript.command="node '/path/to/code-graph-parser-frontend/dist/cli.js' --stdio"
+  -Dcodegraph.parser.process.typescript.command="node '/path/to/code-graph-parser-js/dist/cli.js' --stdio"
 ```
 
 Then parse a `.tsx` or `.ts` file through the normal app API:
