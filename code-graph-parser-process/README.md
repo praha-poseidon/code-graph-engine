@@ -36,7 +36,7 @@ For the frontend React parser:
 
 ```bash
 -Dcodegraph.parser.process.languages=typescript
--Dcodegraph.parser.process.typescript.command="node '/path/to/frontend-code-graph-engine/dist/cli.js' --stdio"
+-Dcodegraph.parser.process.typescript.command="node '/path/to/code-graph-parser-frontend/dist/cli.js' --stdio"
 ```
 
 The same configuration can be supplied with environment variables:
