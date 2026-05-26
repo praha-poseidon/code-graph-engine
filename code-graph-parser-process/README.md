@@ -1,8 +1,8 @@
 # Process Parser Adapter
 
-This module lets `code-graph-engine` call parsers implemented in other languages.
+This module lets `code-graph-core` call parsers implemented in other languages.
 
-这个模块让 `code-graph-engine` 可以调用 Go、Python、TypeScript 等非 JVM 语言实现的解析器。
+这个模块让 `code-graph-core` 可以调用 Go、Python、TypeScript 等非 JVM 语言实现的解析器。
 
 The external parser protocol is intentionally small:
 

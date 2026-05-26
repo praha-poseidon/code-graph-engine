@@ -4,7 +4,7 @@ Graph-engine no longer owns a YAML endpoint rule engine. Endpoint extraction now
 
 1. `java-static-extract-core` parses `.ser` files into rule models.
 2. `java-static-extract-jdt` executes those rules on JDT AST nodes.
-3. `code-graph-engine` maps extracted endpoint labels and fields to graph endpoint classes.
+3. `code-graph-core` maps extracted endpoint labels and fields to graph endpoint classes.
 
 ## Runtime Flow
 

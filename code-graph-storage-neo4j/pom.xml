@@ -6,7 +6,7 @@
 
   <parent>
     <groupId>com.poseidon</groupId>
-    <artifactId>code-graph</artifactId>
+    <artifactId>code-graph-engine</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
@@ -18,7 +18,7 @@
   <dependencies>
     <dependency>
       <groupId>com.poseidon</groupId>
-      <artifactId>code-graph-engine</artifactId>
+      <artifactId>code-graph-core</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

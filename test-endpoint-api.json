@@ -1,17 +1,16 @@
 {
-  "projectName": "code-graph-engine",
-  "absoluteFilePath": "/Users/joker/code-graph/code-graph-engine/src/main/java/com/poseidon/codegraph/engine/adapter/controller/CodeGraphController.java",
-  "projectFilePath": "code-graph-engine/src/main/java/com/poseidon/codegraph/engine/adapter/controller/CodeGraphController.java",
+  "projectName": "code-graph-core",
+  "absoluteFilePath": "/Users/joker/code-graph-engine/code-graph-core/src/main/java/com/poseidon/codegraph/engine/adapter/controller/CodeGraphController.java",
+  "projectFilePath": "code-graph-core/src/main/java/com/poseidon/codegraph/engine/adapter/controller/CodeGraphController.java",
   "gitRepoUrl": "https://github.com/example/code-graph",
   "gitBranch": "main",
   "classpathEntries": [
-    "/Users/joker/code-graph/code-graph-engine/target/classes",
+    "/Users/joker/code-graph-engine/code-graph-core/target/classes",
     "/Users/joker/.m2/repository/org/springframework/boot/spring-boot-starter-web/3.2.0/spring-boot-starter-web-3.2.0.jar",
     "/Users/joker/.m2/repository/org/springframework/spring-web/6.1.1/spring-web-6.1.1.jar",
     "/Users/joker/.m2/repository/org/springframework/spring-webmvc/6.1.1/spring-webmvc-6.1.1.jar"
   ],
   "sourcepathEntries": [
-    "/Users/joker/code-graph/code-graph-engine/src/main/java"
+    "/Users/joker/code-graph-engine/code-graph-core/src/main/java"
   ]
 }
-

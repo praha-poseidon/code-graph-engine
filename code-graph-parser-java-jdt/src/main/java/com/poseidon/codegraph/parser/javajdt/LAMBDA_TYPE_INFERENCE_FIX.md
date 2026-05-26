@@ -217,7 +217,7 @@ parser.setCompilerOptions(options);
 
 ## 相关文件
 
-- 修改文件：`code-graph-engine/src/main/java/com/poseidon/codegraph/engine/domain/parser/JdtSourceCodeParser.java`
+- 修改文件：`code-graph-core/src/main/java/com/poseidon/codegraph/engine/domain/parser/JdtSourceCodeParser.java`
 - 新增依赖：`org.eclipse.jdt.core.JavaCore`
 - 测试文件：`QueryGroupInfoService.java`
 

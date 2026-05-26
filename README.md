@@ -1,6 +1,6 @@
-# Code Graph
+# Code Graph Engine
 
-Code Graph is a pluggable code graph engine for turning source code into queryable graph data. It focuses on project-scale static analysis, incremental updates, endpoint extraction, and replaceable graph storage.
+Code Graph Engine is a pluggable code graph engine for turning source code into queryable graph data. It focuses on project-scale static analysis, incremental updates, endpoint extraction, and replaceable graph storage.
 
 Code Graph 是一个可插拔的代码图谱引擎，用来把源码转换成可查询、可存储、可增量更新的图数据。它重点解决项目级静态分析、增量更新、端点提取和图数据库适配问题。
 
@@ -14,7 +14,7 @@ Most code intelligence products need the same foundation:
 - write the result into a graph database
 - let different language parsers plug into the same graph engine
 
-Code Graph provides this foundation as an engine instead of a closed application.
+Code Graph Engine provides this foundation as an engine instead of a closed application.
 
 很多代码智能产品都需要同一套基础能力：
 
@@ -59,7 +59,7 @@ Code Graph 提供的是这套基础引擎，而不是一个封闭应用。
 | `code-graph-spi` | Parser extension interfaces and ServiceLoader registry. |
 | `code-graph-parser-java-jdt` | Java parser based on Eclipse JDT, including endpoint extraction through SER rules. |
 | `code-graph-parser-process` | Adapter for external parsers running as local processes. |
-| `code-graph-engine` | Domain logic for graph merge, incremental update, placeholder handling, and cascade changes. |
+| `code-graph-core` | Domain logic for graph merge, incremental update, placeholder handling, and cascade changes. |
 | `code-graph-storage-memory` | In-memory repository implementation for tests and local demos. |
 | `code-graph-storage-neo4j` | Neo4j repository implementation. |
 | `code-graph-storage-memgraph` | Memgraph storage module. |
@@ -77,8 +77,8 @@ Requirements:
 Clone and test:
 
 ```bash
-git clone https://github.com/praha-poseidon/code-graph.git
-cd code-graph
+git clone https://github.com/praha-poseidon/code-graph-engine.git
+cd code-graph-engine
 mvn test
 ```
 
@@ -150,7 +150,7 @@ Java parsing can still read syntax when classpath is incomplete, but type-accura
 
 ## Frontend Parser Integration
 
-Code Graph can also consume a frontend parser through `code-graph-parser-process`. The frontend parser runs as a local CLI, receives `ParseRequest` on stdin, returns `GraphDelta` on stdout, and the Java engine writes that delta through the same storage pipeline.
+Code Graph Engine can also consume a frontend parser through `code-graph-parser-process`. The frontend parser runs as a local CLI, receives `ParseRequest` on stdin, returns `GraphDelta` on stdout, and the Java engine writes that delta through the same storage pipeline.
 
 Code Graph 也可以通过 `code-graph-parser-process` 接入前端解析器。前端解析器作为本地 CLI 运行，从标准输入接收 `ParseRequest`，从标准输出返回 `GraphDelta`，Java engine 再通过同一套存储链路写入图谱。
 

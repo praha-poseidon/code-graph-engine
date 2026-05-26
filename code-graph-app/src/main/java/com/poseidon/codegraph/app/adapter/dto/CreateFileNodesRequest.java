@@ -21,7 +21,7 @@ public class CreateFileNodesRequest {
     
     /**
      * 项目文件路径（相对于 Git 根目录，用于存储 ID）
-     * 例如：code-graph-engine/src/main/java/com/Example.java
+     * 例如：code-graph-core/src/main/java/com/Example.java
      */
     private String projectFilePath;
     

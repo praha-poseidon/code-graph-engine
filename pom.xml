@@ -12,11 +12,11 @@
   </parent>
 
   <groupId>com.poseidon</groupId>
-  <artifactId>code-graph</artifactId>
+  <artifactId>code-graph-engine</artifactId>
   <version>0.0.1-SNAPSHOT</version>
   <packaging>pom</packaging>
-  <name>code-graph</name>
-  <description>Multi-module project for code-graph</description>
+  <name>code-graph-engine</name>
+  <description>Multi-module project for code-graph-engine</description>
 
   <properties>
     <java.version>21</java.version>
@@ -30,7 +30,7 @@
     <module>code-graph-spi</module>
     <module>code-graph-parser-process</module>
     <module>code-graph-parser-java-jdt</module>
-    <module>code-graph-engine</module>
+    <module>code-graph-core</module>
     <module>code-graph-storage-neo4j</module>
     <module>code-graph-storage-memory</module>
     <module>code-graph-storage-memgraph</module>

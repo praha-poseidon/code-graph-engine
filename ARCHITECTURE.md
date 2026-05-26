@@ -1,18 +1,18 @@
 # Architecture
 
-Code Graph is split into a small engine core, parser adapters, storage adapters, and an optional Spring Boot runtime.
+Code Graph Engine is split into a small engine core, parser adapters, storage adapters, and an optional Spring Boot runtime.
 
 ## Dependency Direction
 
 ```text
 code-graph-app
   -> code-graph-spring-boot-starter
-      -> code-graph-engine
+      -> code-graph-core
       -> code-graph-spi
       -> storage modules
       -> parser modules through ServiceLoader
 
-code-graph-engine
+code-graph-core
   -> code-graph-model
 
 code-graph-parser-java-jdt
@@ -20,7 +20,7 @@ code-graph-parser-java-jdt
   -> code-graph-spi
 
 code-graph-storage-*
-  -> code-graph-engine repository interfaces
+  -> code-graph-core repository interfaces
   -> code-graph-model
 ```
 
@@ -51,7 +51,7 @@ The Java parser uses Eclipse JDT. Other languages should not reuse Java internal
 
 ## Engine Boundary
 
-`code-graph-engine` applies graph changes. It owns:
+`code-graph-core` applies graph changes. It owns:
 
 - placeholder versus non-placeholder merge decisions
 - insert/update planning
