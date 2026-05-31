@@ -13,7 +13,7 @@ export default function WorkbenchHeader({ controller }: { controller: WorkbenchC
       <div className="flex w-[370px] shrink-0 items-center gap-4">
         <div className="flex items-center gap-2 text-white">
           <Network className="h-[22px] w-[22px] text-violet-300 drop-shadow-[0_0_12px_rgba(139,92,246,0.4)]" strokeWidth={2} />
-          <div className="text-lg font-bold tracking-tight">code-graph</div>
+          <div className="text-lg font-bold tracking-tight">code-graph-engine</div>
         </div>
         <div className="relative max-w-[176px]">
           <button
