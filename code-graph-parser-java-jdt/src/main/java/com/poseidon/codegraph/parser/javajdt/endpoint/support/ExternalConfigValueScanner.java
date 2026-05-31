@@ -17,7 +17,7 @@ import java.util.stream.Stream;
 
 /**
  * Scans application resource config files into the external value dictionary
- * consumed by java-static-extract trace rules.
+ * consumed by static-extract trace rules.
  */
 @Slf4j
 public final class ExternalConfigValueScanner {
