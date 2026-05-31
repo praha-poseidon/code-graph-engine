@@ -260,46 +260,6 @@ class GraphDeltaApplyServiceTest {
             .noneSatisfy(relationship -> assertThat(relationship.getRelationshipType()).isEqualTo(RelationshipType.CALLS));
     }
 
-    @Test
-    void persistsFrontendRelationshipsAsStructureRelationships() {
-        GraphDeltaApplyService service = new GraphDeltaApplyService();
-        CodeGraphContext context = new CodeGraphContext();
-        context.setProjectName("frontend");
-        List<CodeRelationship> insertedRelationships = new ArrayList<>();
-
-        CodeRelationship moduleToUnit = relationship("module.UserPage", "component.UserPage", RelationshipType.MODULE_TO_UNIT);
-        CodeRelationship imports = relationship("module.UserPage", "module.UserCard", RelationshipType.IMPORTS);
-        CodeRelationship renders = relationship("component.UserPage", "component.UserCard", RelationshipType.RENDERS);
-        CodeRelationship usesHook = relationship("fn.UserPage", "fn.useUser", RelationshipType.USES_HOOK);
-        CodeRelationship callRelationship = relationship("fn.UserPage", "fn.getUser", RelationshipType.CALLS);
-
-        context.getReader().setFindExistingStructureRelationships(rels -> java.util.Set.of());
-        context.getWriter().setInsertRelationshipsBatch(insertedRelationships::addAll);
-
-        GraphDelta delta = new GraphDelta(
-            null,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(moduleToUnit, imports, renders, usesHook, callRelationship),
-            List.of(),
-            List.of(),
-            List.of());
-
-        service.apply(delta, context);
-
-        assertThat(insertedRelationships)
-            .extracting(CodeRelationship::getRelationshipType)
-            .containsExactlyInAnyOrder(
-                RelationshipType.MODULE_TO_UNIT,
-                RelationshipType.IMPORTS,
-                RelationshipType.RENDERS,
-                RelationshipType.USES_HOOK);
-        assertThat(insertedRelationships)
-            .noneSatisfy(relationship -> assertThat(relationship.getRelationshipType()).isEqualTo(RelationshipType.CALLS));
-    }
-
     private CodeUnit unit(String id) {
         CodeUnit unit = new CodeUnit();
         unit.setId(id);

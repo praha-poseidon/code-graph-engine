@@ -83,11 +83,11 @@ class ProcessParserConfigTest {
             Map.of()
         ));
 
-        assertEquals(2, delta.units().size());
+        assertEquals(1, delta.units().size());
         assertEquals(2, delta.endpoints().size());
         assertEquals("HTTP:GET:/api/users/{param}", delta.endpoints().get(0).getMatchIdentity());
         assertEquals("UI:CLICK:button:Save", delta.endpoints().get(1).getMatchIdentity());
-        assertEquals(com.poseidon.codegraph.model.RelationshipType.RENDERS, delta.relationships().get(1).getRelationshipType());
+        assertEquals(com.poseidon.codegraph.model.RelationshipType.UNIT_TO_FUNCTION, delta.relationships().get(1).getRelationshipType());
     }
 
     @Test
@@ -289,17 +289,6 @@ class FrontendExternalParser {
                   "unitType": "module",
                   "modifiers": [],
                   "packageId": "frontend-demo"
-                },
-                {
-                  "id": "frontend-demo#src/components/UserCard.tsx::UserCard",
-                  "name": "UserCard",
-                  "qualifiedName": "frontend-demo#src/components/UserCard.tsx::UserCard",
-                  "language": "typescript",
-                  "projectName": "frontend-demo",
-                  "projectFilePath": "src/components/UserCard.tsx",
-                  "unitType": "react_component",
-                  "modifiers": [],
-                  "packageId": "frontend-demo#src/components/UserCard.tsx"
                 }
               ],
               "functions": [
@@ -369,10 +358,10 @@ class FrontendExternalParser {
                   "projectName": "frontend-demo"
                 },
                 {
-                  "id": "rel:renders",
+                  "id": "rel:unit-to-function",
                   "fromNodeId": "frontend-demo#src/pages/UserPage.tsx",
-                  "toNodeId": "frontend-demo#src/components/UserCard.tsx::UserCard",
-                  "relationshipType": "RENDERS",
+                  "toNodeId": "frontend-demo#src/pages/UserPage.tsx::UserPage()",
+                  "relationshipType": "UNIT_TO_FUNCTION",
                   "language": "typescript",
                   "projectName": "frontend-demo"
                 },

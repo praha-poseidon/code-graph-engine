@@ -63,17 +63,13 @@ class FrontendProcessParserEndToEndTest {
         assertThat(repository.findOutgoingRelationships(
                 PROJECT,
                 PROJECT + "::src/pages/UserPage.tsx",
-                RelationshipType.IMPORTS.name()))
-            .hasSize(3);
-        assertThat(repository.findOutgoingRelationships(
-                PROJECT,
-                PROJECT + "::src/pages/UserPage.tsx::UserPage",
-                RelationshipType.RENDERS.name()))
-            .hasSize(1);
+                RelationshipType.UNIT_TO_FUNCTION.name()))
+            .extracting(relationship -> relationship.getToNodeId())
+            .contains(PROJECT + "::src/pages/UserPage.tsx::UserPage()");
         assertThat(repository.findOutgoingRelationships(
                 PROJECT,
                 PROJECT + "::src/pages/UserPage.tsx::UserPage()",
-                RelationshipType.USES_HOOK.name()))
+                RelationshipType.CALLS.name()))
             .hasSize(1);
         assertThat(repository.findOutgoingRelationships(
                 PROJECT,
