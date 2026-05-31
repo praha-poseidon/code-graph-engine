@@ -28,13 +28,13 @@
     </dependency>
     <dependency>
       <groupId>com.poseidon</groupId>
-      <artifactId>java-static-extract-jdt</artifactId>
-      <version>${java-static-extract.version}</version>
+      <artifactId>static-extract-extractor-java-jdt</artifactId>
+      <version>${static-extract.version}</version>
     </dependency>
     <dependency>
       <groupId>com.poseidon</groupId>
-      <artifactId>java-static-extract-core</artifactId>
-      <version>${java-static-extract.version}</version>
+      <artifactId>static-extract-core-java</artifactId>
+      <version>${static-extract.version}</version>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jdt</groupId>

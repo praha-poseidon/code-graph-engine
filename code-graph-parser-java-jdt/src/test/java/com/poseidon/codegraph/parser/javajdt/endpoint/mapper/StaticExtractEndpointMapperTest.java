@@ -7,6 +7,7 @@ import com.poseidon.codegraph.model.endpoint.MqEndpoint;
 import com.poseidon.codegraph.model.endpoint.RedisEndpoint;
 import com.poseidon.javastatic.extract.jdt.StaticExtractResult;
 import com.poseidon.javastatic.extract.rule.EndpointSpec;
+import com.poseidon.javastatic.extract.rule.FactSpec;
 import com.poseidon.javastatic.extract.rule.StaticExtractRule;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.dom.AST;
@@ -120,7 +121,17 @@ class StaticExtractEndpointMapperTest {
     }
 
     private static StaticExtractRule rule(String type, String direction) {
-        return new StaticExtractRule("test", null, true, 0, new EndpointSpec(type, direction), null, null, null);
+        return new StaticExtractRule(
+            "test",
+            null,
+            true,
+            0,
+            new FactSpec("endpoint"),
+            Map.of(),
+            new EndpointSpec(type, direction),
+            null,
+            null,
+            null);
     }
 
     private static StaticExtractResult result(StaticExtractRule rule, Map<String, String> fields, org.eclipse.jdt.core.dom.ASTNode anchor) {
