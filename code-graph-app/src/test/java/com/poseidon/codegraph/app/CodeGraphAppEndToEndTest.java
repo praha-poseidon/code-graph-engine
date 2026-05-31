@@ -109,6 +109,100 @@ class CodeGraphAppEndToEndTest {
             .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Invalid SER syntax")));
     }
 
+    @Test
+    void apiImportsFrontendParserGraphJsonWithoutExplicitDeltaScope() throws Exception {
+        Map<String, Object> rawFrontendGraph = Map.of(
+            "packages", List.of(Map.of(
+                "id", "frontend-demo",
+                "name", "frontend-demo",
+                "qualifiedName", "frontend-demo",
+                "language", "unknown",
+                "projectFilePath", ".",
+                "packagePath", "."
+            )),
+            "units", List.of(Map.of(
+                "id", "frontend-demo#src/pages/UserPage.tsx",
+                "name", "UserPage.tsx",
+                "qualifiedName", "frontend-demo#src/pages/UserPage.tsx",
+                "language", "typescript",
+                "projectFilePath", "src/pages/UserPage.tsx",
+                "startLine", 1,
+                "endLine", 20,
+                "unitType", "module",
+                "packageId", "frontend-demo"
+            )),
+            "functions", List.of(Map.of(
+                "id", "frontend-demo#src/pages/UserPage.tsx::saveUser()",
+                "name", "saveUser",
+                "qualifiedName", "frontend-demo#src/pages/UserPage.tsx::saveUser()",
+                "language", "typescript",
+                "projectFilePath", "src/pages/UserPage.tsx",
+                "startLine", 3,
+                "endLine", 8,
+                "signature", "saveUser()"
+            )),
+            "endpoints", List.of(Map.ofEntries(
+                Map.entry("id", "frontend-demo#src/pages/UserPage.tsx::endpoint:UI:CLICK:button:Save"),
+                Map.entry("name", "UI:CLICK:button:Save"),
+                Map.entry("qualifiedName", "frontend-demo#src/pages/UserPage.tsx::endpoint:UI:CLICK:button:Save"),
+                Map.entry("language", "typescript"),
+                Map.entry("projectFilePath", "src/pages/UserPage.tsx"),
+                Map.entry("startLine", 5),
+                Map.entry("endLine", 5),
+                Map.entry("endpointType", "UI"),
+                Map.entry("direction", "inbound"),
+                Map.entry("isExternal", false),
+                Map.entry("parseLevel", "full"),
+                Map.entry("matchIdentity", "UI:CLICK:button:Save"),
+                Map.entry("uiEvent", "click"),
+                Map.entry("uiElement", "button"),
+                Map.entry("uiText", "Save")
+            )),
+            "relationships", List.of(
+                Map.of(
+                    "id", "rel-package-unit",
+                    "fromNodeId", "frontend-demo",
+                    "toNodeId", "frontend-demo#src/pages/UserPage.tsx",
+                    "relationshipType", "PACKAGE_TO_UNIT",
+                    "language", "typescript"
+                ),
+                Map.of(
+                    "id", "rel-unit-function",
+                    "fromNodeId", "frontend-demo#src/pages/UserPage.tsx",
+                    "toNodeId", "frontend-demo#src/pages/UserPage.tsx::saveUser()",
+                    "relationshipType", "UNIT_TO_FUNCTION",
+                    "language", "typescript"
+                ),
+                Map.of(
+                    "id", "rel-endpoint-function",
+                    "fromNodeId", "frontend-demo#src/pages/UserPage.tsx::endpoint:UI:CLICK:button:Save",
+                    "toNodeId", "frontend-demo#src/pages/UserPage.tsx::saveUser()",
+                    "relationshipType", "ENDPOINT_TO_FUNCTION",
+                    "language", "typescript"
+                )
+            )
+        );
+
+        mockMvc.perform(post("/api/code-graph/delta")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(rawFrontendGraph)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+
+        assertThat(repository.findUnitsByProjectFilePath("frontend-demo", "src/pages/UserPage.tsx"))
+            .extracting(CodeUnitDO::getQualifiedName)
+            .containsExactly("frontend-demo#src/pages/UserPage.tsx");
+        assertThat(repository.findEndpointsByProjectFilePath("frontend-demo", "src/pages/UserPage.tsx"))
+            .extracting(CodeEndpointDO::getEndpointType)
+            .containsExactly("UI");
+        assertThat(repository.findOutgoingRelationships(
+                "frontend-demo",
+                "frontend-demo::frontend-demo#src/pages/UserPage.tsx::endpoint:UI:CLICK:button:Save",
+                "ENDPOINT_TO_FUNCTION"))
+            .extracting(CodeRelationshipDO::getToNodeId)
+            .containsExactly("frontend-demo::frontend-demo#src/pages/UserPage.tsx::saveUser()");
+    }
+
     private void assertGraph(Path sourceFile, String path, String matchIdentity, String functionName) {
         assertThat(repository.findUnitsByProjectFilePath(PROJECT, PROJECT_FILE))
             .extracting(CodeUnitDO::getQualifiedName)

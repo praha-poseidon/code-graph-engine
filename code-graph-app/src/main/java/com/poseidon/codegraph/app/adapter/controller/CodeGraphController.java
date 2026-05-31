@@ -1,5 +1,7 @@
 package com.poseidon.codegraph.app.adapter.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.poseidon.codegraph.app.adapter.dto.ApiResponse;
 import com.poseidon.codegraph.app.adapter.dto.CreateFileNodesRequest;
 import com.poseidon.codegraph.model.delta.GraphDelta;
@@ -21,20 +23,24 @@ import java.util.List;
 public class CodeGraphController {
     
     private final IncrementalUpdateService incrementalUpdateService;
+    private final GraphDeltaImportMapper graphDeltaImportMapper;
     
     @Autowired
-    public CodeGraphController(IncrementalUpdateService incrementalUpdateService) {
+    public CodeGraphController(IncrementalUpdateService incrementalUpdateService, ObjectMapper objectMapper) {
         this.incrementalUpdateService = incrementalUpdateService;
+        this.graphDeltaImportMapper = new GraphDeltaImportMapper(objectMapper);
     }
 
     /**
      * 直接导入解析器产出的 GraphDelta。
      *
-     * <p>适合外部 parser/CLI 已经生成 graph-delta.json 的场景。
+     * <p>适合外部 parser/CLI 已经生成 graph-delta.json 的场景。也兼容 JS parser
+     * 默认输出的裸 graph JSON，导入时会补齐 scope 和 endpointKind。
      */
     @PostMapping("/delta")
-    public ApiResponse<Void> applyGraphDelta(@RequestBody GraphDelta delta) {
+    public ApiResponse<Void> applyGraphDelta(@RequestBody JsonNode payload) {
         try {
+            GraphDelta delta = graphDeltaImportMapper.toGraphDelta(payload);
             String projectName = delta != null && delta.scope() != null ? delta.scope().projectName() : null;
             log.info("导入 GraphDelta 请求: projectName={}", projectName);
             incrementalUpdateService.applyGraphDelta(delta);

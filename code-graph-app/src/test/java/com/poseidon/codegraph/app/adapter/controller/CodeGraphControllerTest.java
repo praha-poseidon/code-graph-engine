@@ -3,6 +3,7 @@ package com.poseidon.codegraph.app.adapter.controller;
 import com.poseidon.codegraph.app.adapter.dto.ApiResponse;
 import com.poseidon.codegraph.app.adapter.dto.CreateFileNodesRequest;
 import com.poseidon.codegraph.starter.service.IncrementalUpdateService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -18,7 +19,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class CodeGraphControllerTest {
 
     private final IncrementalUpdateService service = mock(IncrementalUpdateService.class);
-    private final CodeGraphController controller = new CodeGraphController(service);
+    private final CodeGraphController controller = new CodeGraphController(service, new ObjectMapper());
 
     @Test
     void healthReturnsOk() {
