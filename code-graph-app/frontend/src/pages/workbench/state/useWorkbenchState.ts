@@ -59,7 +59,9 @@ export interface WorkbenchController {
   aiOpen: boolean
   setAiOpen: Dispatch<SetStateAction<boolean>>
   aiWidth: number
+  importingDelta: boolean
   beginAiResize: (event: ReactPointerEvent<HTMLDivElement>) => void
+  importGraphDeltaFile: (file: File) => Promise<void>
   loadNodeGraph: (node: GraphNodeDto) => void
   startTraceFromNode: (node: GraphNode) => void
   runCypherQuery: () => Promise<void>
@@ -96,6 +98,7 @@ export function useWorkbenchState(): WorkbenchController {
   const [leftPanelOpen, setLeftPanelOpen] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
   const [aiWidth, setAiWidth] = useState(440)
+  const [importingDelta, setImportingDelta] = useState(false)
   const aiResizeRef = useRef<{ startX: number; startWidth: number } | null>(null)
 
   const beginAiResize = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -290,6 +293,43 @@ export function useWorkbenchState(): WorkbenchController {
     }
   }
 
+  const importGraphDeltaFile = async (file: File) => {
+    if (importingDelta) return
+    setImportingDelta(true)
+    setLoadingGraph(true)
+    setError(null)
+    try {
+      const text = await file.text()
+      const delta = JSON.parse(text) as { scope?: { gitRepoUrl?: string } }
+      await graphApi.importDelta(delta)
+
+      const nextMetadata = await graphApi.metadata()
+      const nextNodeTypes = nextMetadata?.nodeTypes || []
+      const nextRelationshipTypes = nextMetadata?.relationshipTypes || []
+      const nextGitRepoUrl = delta.scope?.gitRepoUrl || ''
+
+      setMetadata(nextMetadata || { gitRepoUrls: [], nodeTypes: [], relationshipTypes: [] })
+      setSelectedGitRepoUrl(nextGitRepoUrl)
+      setSelectedNodeTypes(nextNodeTypes)
+      setSelectedRelationshipTypes(nextRelationshipTypes)
+      setFiltersReady(true)
+
+      const res = await graphApi.overview({
+        gitRepoUrl: nextGitRepoUrl,
+        nodeTypes: nextNodeTypes,
+        relationshipTypes: nextRelationshipTypes,
+      })
+      setGraphData(mapGraphData(res?.nodes || [], res?.relationships || []))
+      setSelectedNode(null)
+      setTraceRootNode(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '导入 GraphDelta 失败')
+    } finally {
+      setImportingDelta(false)
+      setLoadingGraph(false)
+    }
+  }
+
   return {
     mode,
     setMode,
@@ -329,7 +369,9 @@ export function useWorkbenchState(): WorkbenchController {
     aiOpen,
     setAiOpen,
     aiWidth,
+    importingDelta,
     beginAiResize,
+    importGraphDeltaFile,
     loadNodeGraph,
     startTraceFromNode,
     runCypherQuery,

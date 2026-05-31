@@ -33,6 +33,10 @@ const appendFilters = (params: URLSearchParams, options: { gitRepoUrl?: string; 
 }
 
 export const graphApi = {
+  async importDelta(delta: unknown) {
+    await apiPost<ApiEnvelope<null>>('/api/code-graph/delta', delta)
+  },
+
   async metadata() {
     const res = await apiGet<ApiEnvelope<GraphMetadataDto>>('/api/graph/metadata')
     return res.data

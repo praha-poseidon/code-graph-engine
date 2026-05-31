@@ -7,7 +7,7 @@ import com.poseidon.codegraph.engine.application.model.CodePackageDO;
 import com.poseidon.codegraph.engine.application.model.CodeRelationshipDO;
 import com.poseidon.codegraph.engine.application.model.CodeUnitDO;
 import com.poseidon.codegraph.storage.memory.repository.InMemoryCodeGraphRepository;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,7 +20,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/code-graph/debug")
-@ConditionalOnBean(InMemoryCodeGraphRepository.class)
+@ConditionalOnProperty(name = "code-graph.storage.type", havingValue = "memory", matchIfMissing = true)
 public class CodeGraphDebugController {
 
     private final InMemoryCodeGraphRepository repository;
