@@ -2,6 +2,7 @@ package com.poseidon.codegraph.app.adapter.controller;
 
 import com.poseidon.codegraph.app.adapter.dto.ApiResponse;
 import com.poseidon.codegraph.app.adapter.dto.CreateFileNodesRequest;
+import com.poseidon.codegraph.model.delta.GraphDelta;
 import com.poseidon.codegraph.starter.service.IncrementalUpdateService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,24 @@ public class CodeGraphController {
     @Autowired
     public CodeGraphController(IncrementalUpdateService incrementalUpdateService) {
         this.incrementalUpdateService = incrementalUpdateService;
+    }
+
+    /**
+     * 直接导入解析器产出的 GraphDelta。
+     *
+     * <p>适合外部 parser/CLI 已经生成 graph-delta.json 的场景。
+     */
+    @PostMapping("/delta")
+    public ApiResponse<Void> applyGraphDelta(@RequestBody GraphDelta delta) {
+        try {
+            String projectName = delta != null && delta.scope() != null ? delta.scope().projectName() : null;
+            log.info("导入 GraphDelta 请求: projectName={}", projectName);
+            incrementalUpdateService.applyGraphDelta(delta);
+            return ApiResponse.success("GraphDelta 导入成功", null);
+        } catch (Exception e) {
+            log.error("导入 GraphDelta 失败", e);
+            return ApiResponse.error("导入 GraphDelta 失败: " + detailedMessage(e));
+        }
     }
 
     /**

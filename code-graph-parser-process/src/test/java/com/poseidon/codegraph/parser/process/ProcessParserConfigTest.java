@@ -84,8 +84,9 @@ class ProcessParserConfigTest {
         ));
 
         assertEquals(2, delta.units().size());
-        assertEquals(1, delta.endpoints().size());
+        assertEquals(2, delta.endpoints().size());
         assertEquals("HTTP:GET:/api/users/{param}", delta.endpoints().get(0).getMatchIdentity());
+        assertEquals("UI:CLICK:button:Save", delta.endpoints().get(1).getMatchIdentity());
         assertEquals(com.poseidon.codegraph.model.RelationshipType.RENDERS, delta.relationships().get(1).getRelationshipType());
     }
 
@@ -336,6 +337,26 @@ class FrontendExternalParser {
                   "httpMethod": "GET",
                   "path": "/api/users/1",
                   "normalizedPath": "/api/users/{param}"
+                },
+                {
+                  "endpointKind": "ui",
+                  "id": "endpoint:inbound:UI:save",
+                  "name": "Save",
+                  "qualifiedName": "endpoint:inbound:UI:save",
+                  "language": "typescript",
+                  "projectName": "frontend-demo",
+                  "projectFilePath": "src/pages/UserPage.tsx",
+                  "endpointType": "UI",
+                  "direction": "inbound",
+                  "isExternal": false,
+                  "serviceName": "frontend-demo",
+                  "parseLevel": "full",
+                  "matchIdentity": "UI:CLICK:button:Save",
+                  "uiEvent": "click",
+                  "uiElement": "button",
+                  "uiText": "Save",
+                  "uiSelector": "button[click]",
+                  "componentName": "UserPage"
                 }
               ],
               "relationships": [
@@ -360,6 +381,14 @@ class FrontendExternalParser {
                   "fromNodeId": "frontend-demo#src/pages/UserPage.tsx::UserPage()",
                   "toNodeId": "endpoint:outbound:HTTP:users",
                   "relationshipType": "FUNCTION_TO_ENDPOINT",
+                  "language": "typescript",
+                  "projectName": "frontend-demo"
+                },
+                {
+                  "id": "rel:endpoint-to-function",
+                  "fromNodeId": "endpoint:inbound:UI:save",
+                  "toNodeId": "frontend-demo#src/pages/UserPage.tsx::UserPage()",
+                  "relationshipType": "ENDPOINT_TO_FUNCTION",
                   "language": "typescript",
                   "projectName": "frontend-demo"
                 }

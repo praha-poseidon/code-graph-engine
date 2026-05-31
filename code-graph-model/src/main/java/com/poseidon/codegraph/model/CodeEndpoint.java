@@ -6,6 +6,7 @@ import com.poseidon.codegraph.model.endpoint.DbEndpoint;
 import com.poseidon.codegraph.model.endpoint.HttpEndpoint;
 import com.poseidon.codegraph.model.endpoint.MqEndpoint;
 import com.poseidon.codegraph.model.endpoint.RedisEndpoint;
+import com.poseidon.codegraph.model.endpoint.UiEndpoint;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -20,7 +21,8 @@ import lombok.EqualsAndHashCode;
     @JsonSubTypes.Type(value = HttpEndpoint.class, name = "http"),
     @JsonSubTypes.Type(value = MqEndpoint.class, name = "mq"),
     @JsonSubTypes.Type(value = RedisEndpoint.class, name = "redis"),
-    @JsonSubTypes.Type(value = DbEndpoint.class, name = "db")
+    @JsonSubTypes.Type(value = DbEndpoint.class, name = "db"),
+    @JsonSubTypes.Type(value = UiEndpoint.class, name = "ui")
 })
 public abstract class CodeEndpoint extends CodeNode {
 

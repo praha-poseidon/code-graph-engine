@@ -3,8 +3,11 @@ package com.poseidon.codegraph.starter.service;
 import com.poseidon.codegraph.engine.application.converter.CodeGraphConverter;
 import com.poseidon.codegraph.engine.application.repository.*;
 import com.poseidon.codegraph.engine.domain.context.CodeGraphContext;
+import com.poseidon.codegraph.engine.domain.service.delta.GraphDeltaApplyService;
 import com.poseidon.codegraph.model.event.ChangeType;
 import com.poseidon.codegraph.engine.domain.service.CodeGraphService;
+import com.poseidon.codegraph.model.delta.DeltaScope;
+import com.poseidon.codegraph.model.delta.GraphDelta;
 import com.poseidon.codegraph.spi.CodeGraphParserRegistry;
 import lombok.extern.slf4j.Slf4j;
 
@@ -21,6 +24,7 @@ import java.util.stream.Collectors;
 public class IncrementalUpdateService {
     
     private final CodeGraphService codeGraphService;
+    private final GraphDeltaApplyService graphDeltaApplyService;
     private final CodePackageRepository packageRepository;
     private final CodeUnitRepository unitRepository;
     private final CodeFunctionRepository functionRepository;
@@ -35,6 +39,7 @@ public class IncrementalUpdateService {
             CodeRelationshipRepository relationshipRepository,
             CodeEndpointRepository endpointRepository) {
         this.codeGraphService = new CodeGraphService();
+        this.graphDeltaApplyService = new GraphDeltaApplyService();
         this.packageRepository = packageRepository;
         this.unitRepository = unitRepository;
         this.functionRepository = functionRepository;
@@ -43,6 +48,42 @@ public class IncrementalUpdateService {
         this.parserRegistry = CodeGraphParserRegistry.loadFromServiceLoader();
         
         log.info("IncrementalUpdateService 初始化完成，已加载解析器: {}", parserRegistry.languages());
+    }
+
+    /**
+     * 直接应用外部解析器产出的 GraphDelta。
+     *
+     * <p>这个入口用于“解析”和“入库”已经拆开的场景，例如 JS/TS parser CLI
+     * 已经生成 graph-delta.json，调用方只需要把 delta 交给图谱引擎落库。
+     */
+    public void applyGraphDelta(GraphDelta delta) {
+        if (delta == null) {
+            throw new IllegalArgumentException("GraphDelta 不能为空");
+        }
+        DeltaScope scope = delta.scope();
+        if (scope == null || scope.projectName() == null || scope.projectName().trim().isEmpty()) {
+            throw new IllegalArgumentException("GraphDelta.scope.projectName 不能为空");
+        }
+
+        String projectFilePath = firstSourceFile(scope);
+        CodeGraphContext context = buildContext(
+            scope.projectName(),
+            null,
+            projectFilePath,
+            scope.gitRepoUrl(),
+            scope.gitBranch(),
+            new String[0],
+            new String[0],
+            null,
+            null);
+        if (scope.language() != null && !scope.language().trim().isEmpty()) {
+            context.setLanguage(scope.language());
+        }
+        context.setChangeType(scope.changeType() != null ? scope.changeType() : ChangeType.SOURCE_MODIFIED);
+        context.setOldProjectFilePath(projectFilePath);
+        context.setNewProjectFilePath(projectFilePath);
+
+        graphDeltaApplyService.apply(delta, context);
     }
     
     /**
@@ -417,6 +458,16 @@ public class IncrementalUpdateService {
             return "typescript";
         }
         return "java";
+    }
+
+    private String firstSourceFile(DeltaScope scope) {
+        if (scope.sourceFiles() == null || scope.sourceFiles().isEmpty()) {
+            return null;
+        }
+        return scope.sourceFiles().stream()
+            .filter(path -> path != null && !path.trim().isEmpty())
+            .findFirst()
+            .orElse(null);
     }
     
     /**

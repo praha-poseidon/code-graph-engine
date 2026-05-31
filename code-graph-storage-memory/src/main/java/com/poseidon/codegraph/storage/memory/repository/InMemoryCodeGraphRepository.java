@@ -48,10 +48,18 @@ public class InMemoryCodeGraphRepository implements
             .toList();
     }
 
+    public List<CodePackageDO> findAllPackages() {
+        return new ArrayList<>(packages.values());
+    }
+
     public List<CodeUnitDO> findUnitsByProject(String projectName) {
         return units.values().stream()
             .filter(unit -> sameProject(projectName, unit.getProjectName()))
             .toList();
+    }
+
+    public List<CodeUnitDO> findAllUnits() {
+        return new ArrayList<>(units.values());
     }
 
     public List<CodeFunctionDO> findFunctionsByProject(String projectName) {
@@ -60,16 +68,28 @@ public class InMemoryCodeGraphRepository implements
             .toList();
     }
 
+    public List<CodeFunctionDO> findAllFunctions() {
+        return new ArrayList<>(functions.values());
+    }
+
     public List<CodeEndpointDO> findEndpointsByProject(String projectName) {
         return endpoints.values().stream()
             .filter(endpoint -> sameProject(projectName, endpoint.getProjectName()))
             .toList();
     }
 
+    public List<CodeEndpointDO> findAllEndpoints() {
+        return new ArrayList<>(endpoints.values());
+    }
+
     public List<CodeRelationshipDO> findRelationshipsByProject(String projectName) {
         return relationships.values().stream()
             .filter(relationship -> sameProject(projectName, relationship.getProjectName()))
             .toList();
+    }
+
+    public List<CodeRelationshipDO> findAllRelationships() {
+        return new ArrayList<>(relationships.values());
     }
 
     @Override

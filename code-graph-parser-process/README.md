@@ -155,6 +155,6 @@ Endpoint objects are polymorphic. Add `endpointKind` when returning endpoints:
 }
 ```
 
-Supported `endpointKind` values are `http`, `mq`, `redis`, and `db`.
+Supported `endpointKind` values are `http`, `mq`, `redis`, `db`, and `ui`.
 
-当前支持的 `endpointKind` 是 `http`、`mq`、`redis`、`db`。
+当前支持的 `endpointKind` 是 `http`、`mq`、`redis`、`db`、`ui`。

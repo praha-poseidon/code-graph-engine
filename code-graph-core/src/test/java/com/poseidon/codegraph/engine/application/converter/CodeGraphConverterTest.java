@@ -16,6 +16,7 @@ import com.poseidon.codegraph.model.endpoint.DbEndpoint;
 import com.poseidon.codegraph.model.endpoint.HttpEndpoint;
 import com.poseidon.codegraph.model.endpoint.MqEndpoint;
 import com.poseidon.codegraph.model.endpoint.RedisEndpoint;
+import com.poseidon.codegraph.model.endpoint.UiEndpoint;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -105,6 +106,7 @@ class CodeGraphConverterTest {
         assertMqRoundTrip();
         assertRedisRoundTrip();
         assertDbRoundTrip();
+        assertUiRoundTrip();
     }
 
     @Test
@@ -185,6 +187,25 @@ class CodeGraphConverterTest {
         CodeEndpointDO dobj = CodeGraphConverter.toDO(endpoint);
         assertEquals("DB", dobj.getEndpointType());
         assertEquals("users", assertInstanceOf(DbEndpoint.class, CodeGraphConverter.toDomain(dobj)).getTableName());
+    }
+
+    private void assertUiRoundTrip() {
+        UiEndpoint endpoint = new UiEndpoint();
+        fillCommonEndpoint(endpoint);
+        endpoint.setUiEvent("click");
+        endpoint.setUiElement("button");
+        endpoint.setUiText("保存");
+        endpoint.setUiSelector("button[click]");
+        endpoint.setRoutePath("/users");
+        endpoint.setComponentName("UserPage");
+
+        CodeEndpointDO dobj = CodeGraphConverter.toDO(endpoint);
+        assertEquals("UI", dobj.getEndpointType());
+        UiEndpoint domain = assertInstanceOf(UiEndpoint.class, CodeGraphConverter.toDomain(dobj));
+        assertEquals("click", domain.getUiEvent());
+        assertEquals("button", domain.getUiElement());
+        assertEquals("保存", domain.getUiText());
+        assertEquals("UI:CLICK:button:保存", domain.computeMatchIdentity());
     }
 
     private CodeEndpointDO baseEndpointDO(String endpointType) {

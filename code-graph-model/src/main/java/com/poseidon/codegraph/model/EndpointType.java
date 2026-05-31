@@ -25,8 +25,12 @@ public enum EndpointType {
     DB,
 
     /**
+     * UI 操作端点（按钮点击、表单提交等用户入口）
+     */
+    UI,
+
+    /**
      * 未知类型
      */
     UNKNOWN
 }
-
