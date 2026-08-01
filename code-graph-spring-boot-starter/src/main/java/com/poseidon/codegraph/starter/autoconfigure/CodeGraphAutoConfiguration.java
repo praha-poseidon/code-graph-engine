@@ -5,7 +5,9 @@ import com.poseidon.codegraph.engine.application.repository.CodeFunctionReposito
 import com.poseidon.codegraph.engine.application.repository.CodePackageRepository;
 import com.poseidon.codegraph.engine.application.repository.CodeRelationshipRepository;
 import com.poseidon.codegraph.engine.application.repository.CodeUnitRepository;
+import com.poseidon.codegraph.model.event.NodeChangeListener;
 import com.poseidon.codegraph.starter.service.IncrementalUpdateService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -23,12 +25,15 @@ public class CodeGraphAutoConfiguration {
             CodeUnitRepository unitRepository,
             CodeFunctionRepository functionRepository,
             CodeRelationshipRepository relationshipRepository,
-            CodeEndpointRepository endpointRepository) {
-        return new IncrementalUpdateService(
+            CodeEndpointRepository endpointRepository,
+            ObjectProvider<NodeChangeListener> nodeChangeListenerProvider) {
+        IncrementalUpdateService service = new IncrementalUpdateService(
             packageRepository,
             unitRepository,
             functionRepository,
             relationshipRepository,
             endpointRepository);
+        service.setNodeChangeListener(nodeChangeListenerProvider.getIfAvailable());
+        return service;
     }
 }
