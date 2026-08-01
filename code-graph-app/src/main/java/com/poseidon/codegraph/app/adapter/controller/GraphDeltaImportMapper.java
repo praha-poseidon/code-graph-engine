@@ -80,19 +80,41 @@ final class GraphDeltaImportMapper {
         if (hasText(explicit)) {
             return explicit;
         }
+        // Prefer explicit projectName fields on nodes (not directory package "name" like "src").
         String fromNode = firstText(graph, "projectName", "packages", "units", "functions", "endpoints");
         if (hasText(fromNode)) {
             return fromNode;
         }
-        JsonNode packages = graph.path("packages");
-        if (packages.isArray() && !packages.isEmpty()) {
-            JsonNode first = packages.get(0);
-            String name = text(first.path("name"), text(first.path("id"), null));
-            if (hasText(name)) {
-                return name;
-            }
+        // Frontend unit/package ids look like: knowledgeforge#src/foo/bar.js or knowledgeforge#pkg#src/foo
+        String fromId = projectNameFromNodeIds(graph);
+        if (hasText(fromId)) {
+            return fromId;
         }
         return "imported-graph";
+    }
+
+    /**
+     * Infer project name from stable node ids: "{projectName}#..." / "{projectName}#pkg#...".
+     * Do not use package {@code name} (often a directory basename such as "src").
+     */
+    private String projectNameFromNodeIds(ObjectNode graph) {
+        for (String array : new String[] {"units", "packages", "functions", "endpoints"}) {
+            JsonNode nodes = graph.path(array);
+            if (!nodes.isArray()) {
+                continue;
+            }
+            for (JsonNode node : nodes) {
+                String id = text(node.path("id"), null);
+                if (!hasText(id)) {
+                    continue;
+                }
+                int hash = id.indexOf('#');
+                if (hash > 0) {
+                    return id.substring(0, hash);
+                }
+            }
+        }
+        return null;
     }
 
     private String inferLanguage(ObjectNode graph) {
