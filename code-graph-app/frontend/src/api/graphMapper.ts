@@ -28,11 +28,14 @@ export const nodeDisplayName = (node: GraphNodeDto | GraphNode) => {
 export const mapGraphNode = (node: GraphNodeDto): GraphNode | null => {
   const id = nodeIdentity(node)
   if (!id) return null
+  const type = firstLabel(node)
+  const displayName = nodeDisplayName(node)
 
   return {
     id,
-    type: firstLabel(node),
-    label: nodeDisplayName(node),
+    type,
+    // Keep raw name in label; canvas formats with [TYPE] for display.
+    label: displayName,
     fullName: node.name || node.qualifiedName || node.path || id,
     qualifiedName: node.qualifiedName,
     filePath: node.projectFilePath,
