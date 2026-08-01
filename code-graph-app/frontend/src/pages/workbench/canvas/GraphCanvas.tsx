@@ -48,6 +48,7 @@ const applyCurvedEdgeApproximation = (graph: Graph<SigmaNodeAttributes, SigmaEdg
     const offset = Math.min(42, Math.max(16, length * 0.16)) * offsetDirection
     const controlId = `__curve__${edge}`
     const attributes = { ...graph.getEdgeAttributes(edge) }
+    const label = attributes.label
 
     graph.dropEdge(edge)
     graph.addNode(controlId, {
@@ -60,8 +61,9 @@ const applyCurvedEdgeApproximation = (graph: Graph<SigmaNodeAttributes, SigmaEdg
       isControlPoint: true,
       zIndex: -1,
     })
-    graph.addEdge(source, controlId, attributes)
-    graph.addEdge(controlId, target, attributes)
+    // Put relation label only on the first half so it is not drawn twice.
+    graph.addEdge(source, controlId, { ...attributes, label })
+    graph.addEdge(controlId, target, { ...attributes, label: '' })
   })
 }
 
@@ -89,6 +91,7 @@ export default function GraphCanvas({ data, selectedNodeId, traceRootNodeId, onN
 
     const sigma = new Sigma(graph, containerRef.current, {
       renderLabels: true,
+      renderEdgeLabels: true,
       labelFont: 'PingFang SC, JetBrains Mono, monospace',
       labelSize: 11,
       labelWeight: '500',
@@ -96,6 +99,10 @@ export default function GraphCanvas({ data, selectedNodeId, traceRootNodeId, onN
       labelRenderedSizeThreshold: 7,
       labelDensity: 0.12,
       labelGridCellSize: 74,
+      edgeLabelFont: 'JetBrains Mono, PingFang SC, monospace',
+      edgeLabelSize: 9,
+      edgeLabelWeight: '600',
+      edgeLabelColor: { color: '#c4b5fd' },
       defaultNodeColor: '#6b7280',
       defaultEdgeColor: '#2a2a3a',
       hideEdgesOnMove: true,
@@ -159,6 +166,10 @@ export default function GraphCanvas({ data, selectedNodeId, traceRootNodeId, onN
       },
       edgeReducer: (edge, data) => {
         const result = { ...data }
+        // Always keep relation type label when present.
+        if (data.relationType && !result.label) {
+          result.label = data.relationType
+        }
         const selected = selectedRef.current
         if (!selected) return result
 
@@ -172,6 +183,8 @@ export default function GraphCanvas({ data, selectedNodeId, traceRootNodeId, onN
           result.color = dimColor(data.color || '#4a4a5a', 0.12)
           result.size = 0.3
           result.zIndex = 0
+          // Hide non-selected edge labels to reduce clutter.
+          result.label = ''
         }
         return result
       },
@@ -199,57 +212,86 @@ export default function GraphCanvas({ data, selectedNodeId, traceRootNodeId, onN
     }
   }, [nodeMap, onNodeSelect])
 
+  /**
+   * Call-order (layered) layout around a focus node:
+   * - left  (rank < 0): nodes that call / point into the focus (upstream)
+   * - center (rank 0): focus node
+   * - right (rank > 0): nodes the focus calls / points to (downstream)
+   */
   const runDirectedLayout = useCallback((graph: Graph<SigmaNodeAttributes, SigmaEdgeAttributes>, rootId: string) => {
     if (graph.order === 0) return
 
     const ranks = new Map<string, number>()
-    const queue: string[] = []
-    const root = graph.hasNode(rootId) ? rootId : graph.nodes()[0]
+    const queue: Array<{ id: string; rank: number }> = []
+    const root = graph.hasNode(rootId) ? rootId : graph.nodes().find((id) => !graph.getNodeAttribute(id, 'isControlPoint')) || graph.nodes()[0]
+    if (!root) return
 
     ranks.set(root, 0)
-    queue.push(root)
+    queue.push({ id: root, rank: 0 })
 
     while (queue.length) {
-      const node = queue.shift()
-      if (!node) continue
-      const nextRank = (ranks.get(node) || 0) + 1
-      graph.neighbors(node).forEach((neighbor) => {
+      const current = queue.shift()
+      if (!current) continue
+      const { id, rank } = current
+
+      // Downstream: A -> B  => B is to the right of A
+      graph.outNeighbors(id).forEach((neighbor) => {
+        if (graph.getNodeAttribute(neighbor, 'isControlPoint')) return
         if (ranks.has(neighbor)) return
+        const nextRank = rank + 1
         ranks.set(neighbor, nextRank)
-        queue.push(neighbor)
+        queue.push({ id: neighbor, rank: nextRank })
+      })
+
+      // Upstream: C -> A  => C is to the left of A
+      graph.inNeighbors(id).forEach((neighbor) => {
+        if (graph.getNodeAttribute(neighbor, 'isControlPoint')) return
+        if (ranks.has(neighbor)) return
+        const nextRank = rank - 1
+        ranks.set(neighbor, nextRank)
+        queue.push({ id: neighbor, rank: nextRank })
       })
     }
 
-    const disconnectedRank = Math.max(1, ...Array.from(ranks.values())) + 1
-    graph.nodes().forEach(node => {
+    const rankedValues = Array.from(ranks.values())
+    const maxAbs = rankedValues.length ? Math.max(...rankedValues.map((v) => Math.abs(v)), 1) : 1
+    const disconnectedRank = maxAbs + 1
+    graph.nodes().forEach((node) => {
+      if (graph.getNodeAttribute(node, 'isControlPoint')) return
       if (!ranks.has(node)) ranks.set(node, disconnectedRank)
     })
 
     const layers = new Map<number, string[]>()
     ranks.forEach((rank, node) => {
+      if (graph.getNodeAttribute(node, 'isControlPoint')) return
       const layer = layers.get(rank) || []
       layer.push(node)
       layers.set(rank, layer)
     })
 
-    const nodeGap = graph.order > 120 ? 34 : 48
-    const rankGap = graph.order > 120 ? 150 : 180
-    const layerCount = layers.size
+    const nodeGap = graph.order > 120 ? 40 : 56
+    const rankGap = graph.order > 120 ? 190 : 230
     const minRank = Math.min(...Array.from(layers.keys()))
     const maxRank = Math.max(...Array.from(layers.keys()))
-    const centerOffset = ((maxRank - minRank) * rankGap) / 2
+    const centerOffset = ((maxRank + minRank) * rankGap) / 2
 
     Array.from(layers.entries())
       .sort(([a], [b]) => a - b)
       .forEach(([rank, nodes]) => {
-        nodes.sort((a, b) => String(graph.getNodeAttribute(a, 'label')).localeCompare(String(graph.getNodeAttribute(b, 'label'))))
-        const columnHeight = (nodes.length - 1) * nodeGap
+        nodes.sort((a, b) =>
+          String(graph.getNodeAttribute(a, 'label')).localeCompare(String(graph.getNodeAttribute(b, 'label'))),
+        )
+        const columnHeight = Math.max(0, nodes.length - 1) * nodeGap
         nodes.forEach((node, index) => {
-          const stagger = layerCount > 2 && index % 2 ? 10 : -10
-          graph.setNodeAttribute(node, 'x', (rank - minRank) * rankGap - centerOffset)
-          graph.setNodeAttribute(node, 'y', index * nodeGap - columnHeight / 2 + stagger)
+          graph.setNodeAttribute(node, 'x', rank * rankGap - centerOffset)
+          graph.setNodeAttribute(node, 'y', index * nodeGap - columnHeight / 2)
         })
       })
+
+    // Keep root visually centered on the vertical axis.
+    if (graph.hasNode(root)) {
+      graph.setNodeAttribute(root, 'y', 0)
+    }
 
     applyCurvedEdgeApproximation(graph)
   }, [])
@@ -309,6 +351,13 @@ export default function GraphCanvas({ data, selectedNodeId, traceRootNodeId, onN
       {hoveredNode && !selectedNodeId && (
         <div className="pointer-events-none absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-lg border border-white/10 bg-[#12121c]/95 px-3 py-1.5 text-sm font-mono text-white shadow-xl">
           {hoveredNode}
+        </div>
+      )}
+
+      {traceRootNodeId && (
+        <div className="pointer-events-none absolute bottom-4 left-4 z-20 rounded-lg border border-white/10 bg-[#12121c]/92 px-3 py-2 text-[11px] text-[#b7b0cf] shadow-xl">
+          <div className="font-semibold text-violet-200">调用顺序布局</div>
+          <div>左：调用我的 / 上游 · 中：焦点 · 右：我调用的 / 下游</div>
         </div>
       )}
 
