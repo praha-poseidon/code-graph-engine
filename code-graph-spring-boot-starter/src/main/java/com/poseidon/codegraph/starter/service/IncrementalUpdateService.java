@@ -8,6 +8,7 @@ import com.poseidon.codegraph.model.event.ChangeType;
 import com.poseidon.codegraph.engine.domain.service.CodeGraphService;
 import com.poseidon.codegraph.model.delta.DeltaScope;
 import com.poseidon.codegraph.model.delta.GraphDelta;
+import com.poseidon.codegraph.model.event.NodeChangeListener;
 import com.poseidon.codegraph.spi.CodeGraphParserRegistry;
 import lombok.extern.slf4j.Slf4j;
 
@@ -31,7 +32,16 @@ public class IncrementalUpdateService {
     private final CodeRelationshipRepository relationshipRepository;
     private final CodeEndpointRepository endpointRepository;
     private final CodeGraphParserRegistry parserRegistry;
-    
+
+    /**
+     * 节点级变更事件监听器（可选，由 Spring 容器注入）
+     */
+    private NodeChangeListener nodeChangeListener;
+
+    public void setNodeChangeListener(NodeChangeListener nodeChangeListener) {
+        this.nodeChangeListener = nodeChangeListener;
+    }
+
     public IncrementalUpdateService(
             CodePackageRepository packageRepository,
             CodeUnitRepository unitRepository,
@@ -433,7 +443,13 @@ public class IncrementalUpdateService {
                 true // isCascade = true
             );
         });
-        
+
+        context.getSender().setSendNodeEvent(event -> {
+            if (nodeChangeListener != null) {
+                nodeChangeListener.onNodeChanged(event);
+            }
+        });
+
         return context;
     }
 
