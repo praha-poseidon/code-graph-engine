@@ -10,6 +10,9 @@ import com.poseidon.codegraph.model.GraphIds;
 import com.poseidon.codegraph.model.RelationshipType;
 import com.poseidon.codegraph.model.delta.GraphDelta;
 import com.poseidon.codegraph.model.endpoint.HttpEndpoint;
+import com.poseidon.codegraph.model.event.NodeChangeEvent;
+import com.poseidon.codegraph.model.event.NodeOperation;
+import com.poseidon.codegraph.model.event.NodeType;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -255,9 +258,95 @@ class GraphDeltaApplyServiceTest {
 
         assertThat(insertedRelationships)
             .extracting(CodeRelationship::getRelationshipType)
-            .containsExactlyInAnyOrder(RelationshipType.EXTENDS, RelationshipType.IMPLEMENTS, RelationshipType.OVERRIDES);
-        assertThat(insertedRelationships)
-            .noneSatisfy(relationship -> assertThat(relationship.getRelationshipType()).isEqualTo(RelationshipType.CALLS));
+            .containsExactlyInAnyOrder(
+                RelationshipType.EXTENDS,
+                RelationshipType.IMPLEMENTS,
+                RelationshipType.OVERRIDES,
+                RelationshipType.CALLS);
+    }
+
+    @Test
+    void emitsNodeDeleteEventForDeletedNodeIds() {
+        GraphDeltaApplyService service = new GraphDeltaApplyService();
+        CodeGraphContext context = new CodeGraphContext();
+        context.setProjectName("demo");
+        List<NodeChangeEvent> events = new ArrayList<>();
+
+        context.getWriter().setDeleteRelationship(id -> {});
+        context.getWriter().setDeleteNode(id -> {});
+        context.getSender().setSendNodeEvent(events::add);
+
+        GraphDelta delta = new GraphDelta(
+            null,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of("node-1"),
+            List.of("rel-1"),
+            List.of()
+        );
+
+        service.apply(delta, context);
+
+        assertEquals(1, events.size());
+        assertEquals(NodeOperation.DELETE, events.get(0).getOperation());
+        assertEquals("demo::node-1", events.get(0).getNodeId());
+        assertEquals(null, events.get(0).getNodeType());
+    }
+
+    @Test
+    void emitsNodeChangeEventsForInsertedAndUpdatedPackagesAndUnits() {
+        GraphDeltaApplyService service = new GraphDeltaApplyService();
+        CodeGraphContext context = new CodeGraphContext();
+        context.setProjectName("demo");
+        List<NodeChangeEvent> events = new ArrayList<>();
+
+        CodePackage existingPackage = pkg("com.poseidon");
+        CodePackage newPackage = pkg("com.poseidon.new");
+        CodeUnit existingUnit = unit("com.poseidon.User");
+        CodeUnit newUnit = unit("com.poseidon.NewUser");
+
+        context.getReader().setFindExistingPackagesByQualifiedNames(ids -> java.util.Set.of("demo::com.poseidon"));
+        context.getReader().setFindExistingUnitsByQualifiedNames(ids -> java.util.Set.of("demo::com.poseidon.User"));
+        context.getReader().setFindFunctionsByQualifiedNames(ids -> Map.of());
+        context.getWriter().setInsertPackagesBatch(packages -> {});
+        context.getWriter().setUpdatePackagesBatch(packages -> {});
+        context.getWriter().setInsertUnitsBatch(units -> {});
+        context.getWriter().setUpdateUnitsBatch(units -> {});
+        context.getWriter().setInsertFunctionsBatch(functions -> {});
+        context.getSender().setSendNodeEvent(events::add);
+
+        GraphDelta delta = new GraphDelta(
+            null,
+            List.of(existingPackage, newPackage),
+            List.of(existingUnit, newUnit),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of());
+
+        service.apply(delta, context);
+
+        assertThat(events)
+            .filteredOn(e -> e.getNodeType() == NodeType.PACKAGE && e.getOperation() == NodeOperation.INSERT)
+            .extracting(NodeChangeEvent::getNodeId)
+            .containsExactly("demo::com.poseidon.new");
+        assertThat(events)
+            .filteredOn(e -> e.getNodeType() == NodeType.PACKAGE && e.getOperation() == NodeOperation.UPDATE)
+            .extracting(NodeChangeEvent::getNodeId)
+            .containsExactly("demo::com.poseidon");
+        assertThat(events)
+            .filteredOn(e -> e.getNodeType() == NodeType.UNIT && e.getOperation() == NodeOperation.INSERT)
+            .extracting(NodeChangeEvent::getNodeId)
+            .containsExactly("demo::com.poseidon.NewUser");
+        assertThat(events)
+            .filteredOn(e -> e.getNodeType() == NodeType.UNIT && e.getOperation() == NodeOperation.UPDATE)
+            .extracting(NodeChangeEvent::getNodeId)
+            .containsExactly("demo::com.poseidon.User");
     }
 
     private CodeUnit unit(String id) {
