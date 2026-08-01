@@ -6,6 +6,7 @@ import com.poseidon.codegraph.engine.domain.service.merge.CodeFunctionSavePlan;
 import com.poseidon.codegraph.engine.domain.service.merge.CodeFunctionSavePlanner;
 import com.poseidon.codegraph.model.CodeEndpoint;
 import com.poseidon.codegraph.model.CodeFunction;
+import com.poseidon.codegraph.model.CodeNode;
 import com.poseidon.codegraph.model.CodePackage;
 import com.poseidon.codegraph.model.CodeRelationship;
 import com.poseidon.codegraph.model.CodeUnit;
@@ -15,13 +16,18 @@ import com.poseidon.codegraph.model.delta.Diagnostic;
 import com.poseidon.codegraph.model.delta.DiagnosticLevel;
 import com.poseidon.codegraph.model.delta.GraphDelta;
 import com.poseidon.codegraph.model.delta.GraphDeltaValidator;
+import com.poseidon.codegraph.model.event.NodeChangeEvent;
+import com.poseidon.codegraph.model.event.NodeOperation;
+import com.poseidon.codegraph.model.event.NodeType;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -66,6 +72,7 @@ public class GraphDeltaApplyService {
             createEndpointMatchRelationships(endpoints, context);
         }
 
+        // Structure edges (package/unit/function/endpoint ownership & OO edges).
         List<CodeRelationship> structureRelationships = safeList(delta.relationships()).stream()
             .filter(rel -> rel.getRelationshipType() != RelationshipType.CALLS
                 && rel.getRelationshipType() != RelationshipType.MATCHES)
@@ -74,10 +81,55 @@ public class GraphDeltaApplyService {
         if (!structureRelationships.isEmpty()) {
             saveStructureRelationshipsWithCheck(structureRelationships, context);
         }
+
+        // CALLS used to be skipped here and only rebuilt via per-file Java re-parse.
+        // Frontend / external GraphDelta import never goes through that path, so CALLS
+        // from the delta must be persisted here as well.
+        List<CodeRelationship> callRelationships = safeList(delta.relationships()).stream()
+            .filter(rel -> rel.getRelationshipType() == RelationshipType.CALLS)
+            .collect(Collectors.toList());
+        if (!callRelationships.isEmpty()) {
+            saveCallRelationshipsWithCheck(callRelationships, context);
+        }
     }
 
     private <T> List<T> safeList(List<T> values) {
         return values == null ? List.of() : values;
+    }
+
+    private void emitNodeEvents(CodeGraphContext context, NodeType nodeType, NodeOperation operation,
+                                 List<? extends CodeNode> nodes) {
+        if (nodes.isEmpty() || context.getSender() == null || context.getSender().getSendNodeEvent() == null) {
+            return;
+        }
+        for (CodeNode node : nodes) {
+            NodeChangeEvent event = new NodeChangeEvent();
+            event.setEventId(UUID.randomUUID().toString());
+            event.setProjectName(context.getProjectName());
+            event.setProjectFilePath(node.getProjectFilePath());
+            event.setGitRepoUrl(node.getGitRepoUrl());
+            event.setGitBranch(node.getGitBranch());
+            event.setNodeType(nodeType);
+            event.setOperation(operation);
+            event.setNodeId(node.getId());
+            event.setNode(node);
+            event.setLanguage(node.getLanguage());
+            event.setTimestamp(LocalDateTime.now());
+            context.getSender().getSendNodeEvent().accept(event);
+        }
+    }
+
+    private void emitNodeDeleteEvent(CodeGraphContext context, String nodeId) {
+        if (context.getSender() == null || context.getSender().getSendNodeEvent() == null) {
+            return;
+        }
+        NodeChangeEvent event = new NodeChangeEvent();
+        event.setEventId(UUID.randomUUID().toString());
+        event.setProjectName(context.getProjectName());
+        event.setOperation(NodeOperation.DELETE);
+        event.setNodeId(nodeId);
+        event.setTimestamp(LocalDateTime.now());
+        context.getSender().getSendNodeEvent().accept(event);
     }
 
     private GraphDelta deduplicateEndpoints(GraphDelta delta) {
@@ -139,6 +191,7 @@ public class GraphDeltaApplyService {
         if (context.getWriter().getDeleteNode() != null) {
             for (String nodeId : safeList(delta.deletedNodeIds())) {
                 context.getWriter().getDeleteNode().accept(nodeId);
+                emitNodeDeleteEvent(context, nodeId);
             }
         }
     }
@@ -164,9 +217,11 @@ public class GraphDeltaApplyService {
 
         if (!toInsert.isEmpty()) {
             context.getWriter().getInsertPackagesBatch().accept(toInsert);
+            emitNodeEvents(context, NodeType.PACKAGE, NodeOperation.INSERT, toInsert);
         }
         if (!toUpdate.isEmpty()) {
             context.getWriter().getUpdatePackagesBatch().accept(toUpdate);
+            emitNodeEvents(context, NodeType.PACKAGE, NodeOperation.UPDATE, toUpdate);
         }
     }
 
@@ -191,9 +246,11 @@ public class GraphDeltaApplyService {
 
         if (!toInsert.isEmpty()) {
             context.getWriter().getInsertUnitsBatch().accept(toInsert);
+            emitNodeEvents(context, NodeType.UNIT, NodeOperation.INSERT, toInsert);
         }
         if (!toUpdate.isEmpty()) {
             context.getWriter().getUpdateUnitsBatch().accept(toUpdate);
+            emitNodeEvents(context, NodeType.UNIT, NodeOperation.UPDATE, toUpdate);
         }
     }
 
@@ -210,9 +267,11 @@ public class GraphDeltaApplyService {
 
         if (!plan.toInsert().isEmpty()) {
             context.getWriter().getInsertFunctionsBatch().accept(plan.toInsert());
+            emitNodeEvents(context, NodeType.FUNCTION, NodeOperation.INSERT, plan.toInsert());
         }
         if (!plan.toUpdate().isEmpty()) {
             context.getWriter().getUpdateFunctionsBatch().accept(plan.toUpdate());
+            emitNodeEvents(context, NodeType.FUNCTION, NodeOperation.UPDATE, plan.toUpdate());
         }
         if (!plan.skipped().isEmpty()) {
             log.debug("跳过占位符函数覆盖真实函数: count={}", plan.skipped().size());
@@ -242,6 +301,7 @@ public class GraphDeltaApplyService {
 
         if (!toInsert.isEmpty()) {
             context.getWriter().getInsertEndpointsBatch().accept(toInsert);
+            emitNodeEvents(context, NodeType.ENDPOINT, NodeOperation.INSERT, toInsert);
         }
 
         log.info("端点保存完成：去重后 {} 个，新插入 {} 个，已存在 {} 个（跳过）",
@@ -318,6 +378,34 @@ public class GraphDeltaApplyService {
         if (!toInsert.isEmpty()) {
             context.getWriter().getInsertRelationshipsBatch().accept(toInsert);
             log.info("批量插入结构关系: count={}", toInsert.size());
+        }
+    }
+
+    private void saveCallRelationshipsWithCheck(List<CodeRelationship> relationships, CodeGraphContext context) {
+        if (relationships.isEmpty() || context.getWriter().getInsertRelationshipsBatch() == null) {
+            return;
+        }
+
+        // Prefer structure-existence probe when available; otherwise insert all CALLS.
+        List<com.poseidon.codegraph.engine.application.model.CodeRelationshipDO> relationshipDOs = relationships.stream()
+            .map(CodeGraphConverter::toDO)
+            .collect(Collectors.toList());
+
+        Set<String> existingKeys = context.getReader().getFindExistingStructureRelationships() != null
+            ? context.getReader().getFindExistingStructureRelationships().apply(relationshipDOs)
+            : Set.of();
+
+        List<CodeRelationship> toInsert = new ArrayList<>();
+        for (CodeRelationship rel : relationships) {
+            String key = rel.getFromNodeId() + ":" + rel.getToNodeId() + ":" + rel.getRelationshipType();
+            if (!existingKeys.contains(key)) {
+                toInsert.add(rel);
+            }
+        }
+
+        if (!toInsert.isEmpty()) {
+            context.getWriter().getInsertRelationshipsBatch().accept(toInsert);
+            log.info("批量插入 CALLS 关系: count={}", toInsert.size());
         }
     }
 }
