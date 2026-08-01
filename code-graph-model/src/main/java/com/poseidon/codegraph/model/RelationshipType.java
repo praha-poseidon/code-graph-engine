@@ -9,11 +9,21 @@ public enum RelationshipType {
      * 函数调用关系
      */
     CALLS("CodeFunction", "CodeFunction"),
+
+    /**
+     * React/Vue 等组件渲染关系：父组件函数 → 子组件函数
+     */
+    RENDERS("CodeFunction", "CodeFunction"),
     
     /**
      * 包包含单元
      */
     PACKAGE_TO_UNIT("CodePackage", "CodeUnit"),
+
+    /**
+     * 目录包层级（父目录 package → 子目录 package）
+     */
+    PACKAGE_TO_PACKAGE("CodePackage", "CodePackage"),
     
     /**
      * 单元包含函数
