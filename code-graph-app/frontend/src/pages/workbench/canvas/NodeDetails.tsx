@@ -61,9 +61,9 @@ export default function NodeDetails({ controller }: { controller: WorkbenchContr
               onChange={event => controller.setTraceDirection(event.target.value as 'FORWARD' | 'BACKWARD' | 'BOTH')}
               className="h-9 rounded-lg border border-white/10 bg-[#080912] px-3 text-xs text-[#dcd5ef] outline-none transition focus:border-violet-400/50"
             >
+              <option value="FORWARD">Forward (caller → callee)</option>
+              <option value="BACKWARD">Backward (callee ← caller)</option>
               <option value="BOTH">Both ways</option>
-              <option value="FORWARD">Forward</option>
-              <option value="BACKWARD">Backward</option>
             </select>
             <select
               value={controller.traceDepth}

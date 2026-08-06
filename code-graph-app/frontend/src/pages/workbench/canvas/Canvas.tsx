@@ -13,6 +13,7 @@ export default function Canvas({ controller }: { controller: WorkbenchController
           data={controller.graphData}
           selectedNodeId={controller.selectedNode?.id || null}
           traceRootNodeId={controller.traceRootNode?.id || null}
+          traceDirection={controller.traceDirection}
           onNodeSelect={controller.setSelectedNode}
           renderToolbar={(controls) => (
             <CanvasTools

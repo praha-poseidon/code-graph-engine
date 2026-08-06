@@ -16,6 +16,8 @@ export interface GraphEdge {
   source: string
   target: string
   type: string
+  /** Edge type label rendered on canvas */
+  label?: string
   lineNumber?: number
 }
 

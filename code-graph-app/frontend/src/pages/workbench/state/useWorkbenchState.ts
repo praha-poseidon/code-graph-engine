@@ -92,7 +92,7 @@ export function useWorkbenchState(): WorkbenchController {
   const [cypher, setCypher] = useState('MATCH p=(n)-[r]->(m) RETURN p LIMIT 100')
   const [querying, setQuerying] = useState(false)
   const [traceDepth, setTraceDepth] = useState(2)
-  const [traceDirection, setTraceDirection] = useState<'FORWARD' | 'BACKWARD' | 'BOTH'>('BOTH')
+  const [traceDirection, setTraceDirection] = useState<'FORWARD' | 'BACKWARD' | 'BOTH'>('FORWARD')
   const [filterOpen, setFilterOpen] = useState(false)
   const [insightOpen, setInsightOpen] = useState(false)
   const [leftPanelOpen, setLeftPanelOpen] = useState(false)

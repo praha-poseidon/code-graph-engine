@@ -76,23 +76,63 @@ public class GraphViewController {
 
     @PostMapping("/traverse")
     public ApiResponse<GraphResponse> traverse(@RequestBody TraverseRequest request) {
+        return ApiResponse.success(walk(request));
+    }
+
+    @PostMapping("/trace")
+    public ApiResponse<GraphResponse> trace(@RequestBody TraverseRequest request) {
+        // Trace follows relationship direction (CALLS: caller -> callee).
+        // FORWARD  = outbound edges (from -> to)
+        // BACKWARD = inbound edges (to <- from)
+        // BOTH     = undirected expansion
+        return ApiResponse.success(walk(request));
+    }
+
+    private GraphResponse walk(TraverseRequest request) {
         if (request == null || !hasText(request.startNodeId())) {
-            return ApiResponse.success(new GraphResponse(List.of(), List.of()));
+            return new GraphResponse(List.of(), List.of());
         }
-        int maxDepth = request.maxDepth() == null ? 2 : Math.max(1, request.maxDepth());
+        int maxDepth = request.maxDepth() == null ? 2 : Math.max(1, Math.min(request.maxDepth(), 12));
+        String direction = normalizeDirection(request.direction());
+        List<String> allowedRelTypes = request.relationshipTypes();
+
         Set<String> visited = new LinkedHashSet<>();
         Set<String> frontier = new LinkedHashSet<>();
         frontier.add(request.startNodeId());
         visited.add(request.startNodeId());
+        List<CodeRelationshipDO> usedRels = new ArrayList<>();
 
         for (int depth = 0; depth < maxDepth; depth++) {
             Set<String> next = new LinkedHashSet<>();
             for (CodeRelationshipDO relationship : repository.findAllRelationships()) {
-                if (frontier.contains(relationship.getFromNodeId()) && visited.add(relationship.getToNodeId())) {
-                    next.add(relationship.getToNodeId());
+                if (relationship == null) {
+                    continue;
                 }
-                if (frontier.contains(relationship.getToNodeId()) && visited.add(relationship.getFromNodeId())) {
-                    next.add(relationship.getFromNodeId());
+                if (allowedRelTypes != null && !allowedRelTypes.isEmpty()
+                        && !allowedRelTypes.contains(relationship.getRelationshipType())) {
+                    continue;
+                }
+                String from = relationship.getFromNodeId();
+                String to = relationship.getToNodeId();
+                if (!hasText(from) || !hasText(to)) {
+                    continue;
+                }
+                boolean forwardHit = ("FORWARD".equals(direction) || "BOTH".equals(direction))
+                        && frontier.contains(from);
+                boolean backwardHit = ("BACKWARD".equals(direction) || "BOTH".equals(direction))
+                        && frontier.contains(to);
+
+                if (forwardHit && visited.add(to)) {
+                    next.add(to);
+                    usedRels.add(relationship);
+                } else if (forwardHit && visited.contains(to)) {
+                    usedRels.add(relationship);
+                }
+                if (backwardHit && visited.add(from)) {
+                    next.add(from);
+                    usedRels.add(relationship);
+                } else if (backwardHit && visited.contains(from)) {
+                    usedRels.add(relationship);
                 }
             }
             frontier = next;
@@ -104,13 +144,49 @@ public class GraphViewController {
         List<GraphNode> nodes = allNodes().stream()
             .filter(node -> visited.contains(node.id()))
             .toList();
-        List<GraphRelationship> relationships = relationshipsForNodeIds(visited, null, 1000);
-        return ApiResponse.success(new GraphResponse(nodes, relationships));
+
+        // Prefer edges actually walked; fall back to induced subgraph if empty
+        List<GraphRelationship> relationships = dedupeRelationships(usedRels).stream()
+            .filter(rel -> visited.contains(rel.getFromNodeId()) && visited.contains(rel.getToNodeId()))
+            .map(rel -> new GraphRelationship(
+                rel.getFromNodeId(),
+                rel.getToNodeId(),
+                rel.getRelationshipType(),
+                null,
+                null,
+                rel.getLineNumber()))
+            .toList();
+        if (relationships.isEmpty()) {
+            relationships = relationshipsForNodeIds(visited, allowedRelTypes, 1000);
+        }
+        return new GraphResponse(nodes, relationships);
     }
 
-    @PostMapping("/trace")
-    public ApiResponse<GraphResponse> trace(@RequestBody TraverseRequest request) {
-        return traverse(request);
+    private String normalizeDirection(String direction) {
+        if (!hasText(direction)) {
+            return "BOTH";
+        }
+        String value = direction.trim().toUpperCase(Locale.ROOT);
+        return switch (value) {
+            case "FORWARD", "OUT", "OUTGOING" -> "FORWARD";
+            case "BACKWARD", "IN", "INCOMING" -> "BACKWARD";
+            default -> "BOTH";
+        };
+    }
+
+    private List<CodeRelationshipDO> dedupeRelationships(List<CodeRelationshipDO> relationships) {
+        Set<String> seen = new LinkedHashSet<>();
+        List<CodeRelationshipDO> out = new ArrayList<>();
+        for (CodeRelationshipDO rel : relationships) {
+            if (rel == null) {
+                continue;
+            }
+            String key = rel.getFromNodeId() + "|" + rel.getRelationshipType() + "|" + rel.getToNodeId();
+            if (seen.add(key)) {
+                out.add(rel);
+            }
+        }
+        return out;
     }
 
     @PostMapping("/query")
@@ -271,6 +347,11 @@ public class GraphViewController {
         Integer lineNumber) {
     }
 
-    public record TraverseRequest(String startNodeId, Integer maxDepth, String direction) {
+    public record TraverseRequest(
+            String startNodeId,
+            Integer maxDepth,
+            String direction,
+            List<String> nodeTypes,
+            List<String> relationshipTypes) {
     }
 }

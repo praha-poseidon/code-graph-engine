@@ -1,7 +1,34 @@
 import type { GraphData, GraphNode } from '../types/graph'
 import type { GraphNodeDto, GraphRelationshipDto } from './graphDto'
 
-const firstLabel = (node: GraphNodeDto) => node.type || node.labels?.[0] || 'CodeElement'
+/** Normalize backend type tags (PACKAGE/UNIT/FUNCTION/HTTP) to workbench kinds. */
+export const normalizeNodeType = (raw?: string) => {
+  const value = (raw || 'CodeElement').trim()
+  const upper = value.toUpperCase()
+  if (upper === 'PACKAGE' || upper === 'CODEPACKAGE') return 'CodePackage'
+  if (upper === 'UNIT' || upper === 'CODEUNIT' || upper === 'CLASS' || upper === 'INTERFACE') return 'CodeUnit'
+  if (upper === 'FUNCTION' || upper === 'CODEFUNCTION' || upper === 'METHOD') return 'CodeFunction'
+  if (upper === 'ENDPOINT' || upper === 'CODEENDPOINT' || upper === 'HTTP' || upper === 'MQ' || upper === 'REDIS' || upper === 'DB' || upper === 'UI') {
+    return 'CodeEndpoint'
+  }
+  if (value.startsWith('Code')) return value
+  return value
+}
+
+export const nodeTypeShortLabel = (type: string) => {
+  switch (normalizeNodeType(type)) {
+    case 'CodePackage':
+      return 'PKG'
+    case 'CodeUnit':
+      return 'UNIT'
+    case 'CodeFunction':
+      return 'FN'
+    case 'CodeEndpoint':
+      return 'EP'
+    default:
+      return type || 'NODE'
+  }
+}
 
 export const shortText = (value: string, max = 34) => {
   if (!value) return ''
@@ -25,17 +52,22 @@ export const nodeDisplayName = (node: GraphNodeDto | GraphNode) => {
   return '(unknown)'
 }
 
+/** Visible node caption: type + name */
+export const nodeCaption = (type: string, name: string) => {
+  const shortName = shortText(name, 28)
+  return `[${nodeTypeShortLabel(type)}] ${shortName}`
+}
+
 export const mapGraphNode = (node: GraphNodeDto): GraphNode | null => {
   const id = nodeIdentity(node)
   if (!id) return null
-  const type = firstLabel(node)
-  const displayName = nodeDisplayName(node)
+  const type = normalizeNodeType(firstLabel(node))
+  const name = nodeDisplayName(node)
 
   return {
     id,
     type,
-    // Keep raw name in label; canvas formats with [TYPE] for display.
-    label: displayName,
+    label: nodeCaption(type, name),
     fullName: node.name || node.qualifiedName || node.path || id,
     qualifiedName: node.qualifiedName,
     filePath: node.projectFilePath,
@@ -45,6 +77,8 @@ export const mapGraphNode = (node: GraphNodeDto): GraphNode | null => {
     depth: node.depth,
   }
 }
+
+const firstLabel = (node: GraphNodeDto) => node.type || node.labels?.[0] || 'CodeElement'
 
 export const mapGraphData = (
   nodes: GraphNodeDto[],
@@ -70,16 +104,17 @@ export const mapGraphData = (
       nodeMap.set(fromNodeId, {
         id: fromNodeId,
         type: 'CodeElement',
-        label: shortText(fromNodeId),
+        label: nodeCaption('CodeElement', fromNodeId),
         fullName: fromNodeId,
       })
     }
     if (!nodeMap.has(toNodeId)) {
+      const name = rel.toNodeName || rel.toQualifiedName || toNodeId
       nodeMap.set(toNodeId, {
         id: toNodeId,
         type: 'CodeElement',
-        label: shortText(rel.toNodeName || rel.toQualifiedName || toNodeId),
-        fullName: rel.toNodeName || rel.toQualifiedName || toNodeId,
+        label: nodeCaption('CodeElement', name),
+        fullName: name,
         qualifiedName: rel.toQualifiedName,
       })
     }
@@ -88,11 +123,13 @@ export const mapGraphData = (
   const edges = relationships.map((rel, index) => {
     const fromNodeId = idByElementId.get(rel.fromNodeId) || rel.fromNodeId
     const toNodeId = idByElementId.get(rel.toNodeId) || rel.toNodeId
+    const relType = rel.relationshipType || 'RELATED'
     return {
-      id: `${fromNodeId}->${toNodeId}:${rel.relationshipType}:${index}`,
+      id: `${fromNodeId}->${toNodeId}:${relType}:${index}`,
       source: fromNodeId,
       target: toNodeId,
-      type: rel.relationshipType,
+      type: relType,
+      label: relType,
       lineNumber: rel.lineNumber,
     }
   })
