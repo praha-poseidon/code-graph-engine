@@ -97,7 +97,8 @@ public class JavaJdtCodeGraphParser implements CodeGraphParser {
         if (value instanceof String text && !text.isBlank()) {
             return Boolean.parseBoolean(text);
         }
-        return true;
+        // static-extract-java no longer ships built-in SER rules
+        return false;
     }
 
     private String projectFilePath(ParseRequest request, String sourceFile) {

@@ -15,11 +15,83 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaJdtCodeGraphParserTest {
 
+    private static final String SPRING_MVC = """
+            rule "Spring MVC HTTP Inbound"
+            endpoint HTTP inbound
+
+            find method
+            when annotation @*Mapping on method
+
+            let basePath =
+              from annotation @RequestMapping on class take attr(value)
+              from annotation @RequestMapping on class take attr(path)
+              fallback ""
+            let methodPath =
+              from annotation @*Mapping on method take attr(value)
+              from annotation @*Mapping on method take attr(path)
+              fallback ""
+            let httpMethod =
+              from annotation @*Mapping on method take name
+              map {
+                GetMapping: GET
+                PostMapping: POST
+                PutMapping: PUT
+                DeleteMapping: DELETE
+                PatchMapping: PATCH
+                RequestMapping: GET
+              }
+
+            build {
+              httpMethod: httpMethod
+              path: concat(basePath, methodPath) | normalize slash | normalize pathVariable
+            }
+            """;
+
+    private static final String REST_TEMPLATE_WITH_CONFIG_REF = """
+            rule "RestTemplate HTTP Outbound"
+            endpoint HTTP outbound
+
+            find call RestTemplate.[getForObject,getForEntity,postForObject,postForEntity,put,delete]
+
+            let rawUrl =
+              from argument[0] take value
+
+            let httpMethod =
+              from method take name
+              map {
+                getForObject: GET
+                getForEntity: GET
+                postForObject: POST
+                postForEntity: POST
+                put: PUT
+                delete: DELETE
+              }
+
+            build {
+              httpMethod: httpMethod
+              path: rawUrl | normalize extractPath | normalize pathVariable
+            }
+
+            trace {
+              from field
+              when annotation @ConfigRef on field
+
+              let rawValue =
+                from annotation @ConfigRef on field take attr(value)
+
+              build {
+                namespace: "config"
+                lookup: rawValue | normalize placeholderLookup
+                default: rawValue | normalize placeholderDefault
+              }
+            }
+            """;
+
     @TempDir
     Path tempDir;
 
     @Test
-    void parsesSpringMvcEndpointWithBuiltinRulesByDefault() throws Exception {
+    void parsesSpringMvcEndpointWhenRuleSourcesAreSupplied() throws Exception {
         Path source = tempDir.resolve("src/main/java/com/example/UserController.java");
         Files.createDirectories(source.getParent());
         Files.writeString(
@@ -53,7 +125,7 @@ class JavaJdtCodeGraphParserTest {
             null,
             null,
             null,
-            List.of(),
+            List.of(SPRING_MVC),
             List.of(),
             Map.of(),
             Map.of("projectFilePath", "src/main/java/com/example/UserController.java")
@@ -71,7 +143,7 @@ class JavaJdtCodeGraphParserTest {
     }
 
     @Test
-    void parseRequestCanSupplyTraceRulesAndExternalValuesForEndpointExtraction() throws Exception {
+    void parseRequestCanSupplyRuleWithEmbeddedTraceAndExternalValues() throws Exception {
         Path source = tempDir.resolve("src/main/java/com/example/UserClient.java");
         Files.createDirectories(source.getParent());
         Files.writeString(
@@ -113,23 +185,8 @@ class JavaJdtCodeGraphParserTest {
             null,
             null,
             null,
+            List.of(REST_TEMPLATE_WITH_CONFIG_REF),
             List.of(),
-            List.of(
-                """
-                trace "Custom ConfigRef Trace"
-
-                from field
-                when annotation @ConfigRef on field
-
-                let rawValue =
-                  from annotation on field @ConfigRef take attr(value)
-
-                build {
-                  namespace: "config"
-                  lookup: rawValue | normalize placeholderLookup
-                  default: rawValue | normalize placeholderDefault
-                }
-                """),
             Map.of("config", Map.of("users.base-url", List.of("http://users.example/api/v1"))),
             Map.of("projectFilePath", "src/main/java/com/example/UserClient.java")
         ));

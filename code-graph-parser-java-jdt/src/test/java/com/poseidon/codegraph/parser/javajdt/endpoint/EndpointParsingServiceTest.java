@@ -18,8 +18,91 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 class EndpointParsingServiceTest {
 
+    private static final String SPRING_MVC = """
+            rule "Spring MVC HTTP Inbound"
+            endpoint HTTP inbound
+
+            find method
+            when annotation @*Mapping on method
+
+            let basePath =
+              from annotation @RequestMapping on class take attr(value)
+              from annotation @RequestMapping on class take attr(path)
+              fallback ""
+            let methodPath =
+              from annotation @*Mapping on method take attr(value)
+              from annotation @*Mapping on method take attr(path)
+              fallback ""
+            let httpMethod =
+              from annotation @*Mapping on method take name
+              map {
+                GetMapping: GET
+                PostMapping: POST
+                PutMapping: PUT
+                DeleteMapping: DELETE
+                PatchMapping: PATCH
+                RequestMapping: GET
+              }
+
+            build {
+              httpMethod: httpMethod
+              path: concat(basePath, methodPath) | normalize slash | normalize pathVariable
+            }
+            """;
+
+    private static final String REST_TEMPLATE = """
+            rule "RestTemplate HTTP Outbound"
+            endpoint HTTP outbound
+
+            find call RestTemplate.[getForObject,getForEntity,postForObject,postForEntity,put,delete]
+
+            let rawUrl =
+              from argument[0] take value
+
+            let httpMethod =
+              from method take name
+              map {
+                getForObject: GET
+                getForEntity: GET
+                postForObject: POST
+                postForEntity: POST
+                put: PUT
+                delete: DELETE
+              }
+
+            build {
+              httpMethod: httpMethod
+              path: rawUrl | normalize extractPath | normalize pathVariable
+            }
+
+            trace {
+              from field
+              when annotation @Value on field
+
+              let rawValue =
+                from annotation @Value on field take attr(value)
+
+              build {
+                namespace: "config"
+                lookup: rawValue | normalize placeholderLookup
+                default: rawValue | normalize placeholderDefault
+              }
+
+              from call
+              when method Environment.getProperty
+
+              let configLookup =
+                from argument[0] take value
+
+              build {
+                namespace: "config"
+                lookup: configLookup
+              }
+            }
+            """;
+
     @Test
-    void parsesSpringMvcEndpointThroughApplicationSerRules() {
+    void parsesSpringMvcEndpointThroughCallerSerRules() {
         CompilationUnit cu =
                 parse(
                         """
@@ -39,8 +122,7 @@ class EndpointParsingServiceTest {
                         }
                         """);
         TypeDeclaration type = (TypeDeclaration) cu.types().get(0);
-        EndpointParsingService service = new EndpointParsingService();
-        service.init();
+        EndpointParsingService service = new EndpointParsingService(List.of(SPRING_MVC), List.of(), false);
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
@@ -60,7 +142,7 @@ class EndpointParsingServiceTest {
     }
 
     @Test
-    void resolvesOutboundPathFromSpringValueTraceAndExternalValues() {
+    void resolvesOutboundPathFromEmbeddedTraceAndExternalValues() {
         CompilationUnit cu =
                 parse(
                         """
@@ -85,8 +167,7 @@ class EndpointParsingServiceTest {
                         }
                         """);
         TypeDeclaration type = (TypeDeclaration) cu.types().get(1);
-        EndpointParsingService service = new EndpointParsingService();
-        service.init();
+        EndpointParsingService service = new EndpointParsingService(List.of(REST_TEMPLATE), List.of(), false);
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
@@ -127,36 +208,7 @@ class EndpointParsingServiceTest {
                         }
                         """);
         TypeDeclaration type = (TypeDeclaration) cu.types().get(0);
-        EndpointParsingService service =
-                new EndpointParsingService(
-                        List.of(
-                                """
-                                rule "External Spring MVC"
-                                endpoint HTTP inbound
-
-                                find method with annotation @*Mapping
-
-                                let basePath =
-                                  from annotation on class @RequestMapping take attr(value)
-                                  default ""
-
-                                let methodPath =
-                                  from annotation on method @*Mapping take attr(value)
-                                  default ""
-
-                                let httpMethod =
-                                  from annotation on method @*Mapping take name
-                                  map {
-                                    GetMapping: GET
-                                  }
-
-                                build {
-                                  httpMethod: httpMethod
-                                  path: concat(basePath, methodPath) | normalize slash | normalize pathVariable
-                                }
-                                """),
-                        List.of(),
-                        false);
+        EndpointParsingService service = new EndpointParsingService(List.of(SPRING_MVC), List.of(), false);
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
@@ -173,7 +225,7 @@ class EndpointParsingServiceTest {
     }
 
     @Test
-    void acceptsUnifiedExternalSerSourceWithRuleAndTraceBlocks() {
+    void acceptsUnifiedSerSourceWithEmbeddedTraceBlock() {
         CompilationUnit cu =
                 parse(
                         """
@@ -198,45 +250,7 @@ class EndpointParsingServiceTest {
                         }
                         """);
         TypeDeclaration type = (TypeDeclaration) cu.types().get(1);
-        EndpointParsingService service =
-                new EndpointParsingService(
-                        List.of(
-                                """
-                                rule "External RestTemplate"
-                                endpoint HTTP outbound
-
-                                find method RestTemplate.getForObject
-
-                                let rawUrl =
-                                  from argument[0] take value
-
-                                let httpMethod =
-                                  from method take name
-                                  map {
-                                    getForObject: GET
-                                  }
-
-                                build {
-                                  httpMethod: httpMethod
-                                  path: rawUrl | normalize extractPath | normalize pathVariable
-                                }
-
-                                trace "External Config Trace"
-
-                                from field
-                                when annotation @Value on field
-
-                                let rawValue =
-                                  from annotation on field @Value take attr(value)
-
-                                build {
-                                  namespace: "config"
-                                  lookup: rawValue | normalize placeholderLookup
-                                  default: rawValue | normalize placeholderDefault
-                                }
-                                """),
-                        List.of(),
-                        false);
+        EndpointParsingService service = new EndpointParsingService(List.of(REST_TEMPLATE), List.of(), false);
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
@@ -276,8 +290,7 @@ class EndpointParsingServiceTest {
                         }
                         """);
         TypeDeclaration type = (TypeDeclaration) cu.types().get(0);
-        EndpointParsingService service = new EndpointParsingService();
-        service.init();
+        EndpointParsingService service = new EndpointParsingService(List.of(SPRING_MVC), List.of(), false);
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
@@ -299,16 +312,18 @@ class EndpointParsingServiceTest {
     void reportsEndpointRuleSourceIndexWhenExternalSerIsInvalid() {
         assertThatThrownBy(() -> new EndpointParsingService(List.of("broken rule"), List.of(), false))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid endpoint SER rule source at index 0")
-                .hasMessageContaining("Invalid SER syntax");
+                .hasMessageContaining("Invalid endpoint SER rule source at index 0");
     }
 
     @Test
-    void reportsTraceRuleSourceIndexWhenExternalTraceSerIsInvalid() {
-        assertThatThrownBy(() -> new EndpointParsingService(List.of(), List.of("broken trace"), false))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid trace SER rule source at index 0")
-                .hasMessageContaining("Invalid SER syntax");
+    void emptyRulesYieldNoEndpoints() {
+        EndpointParsingService service = new EndpointParsingService(List.of(), List.of(), false);
+        service.init();
+        CompilationUnit cu = parse("package com.example; class A {}");
+        TypeDeclaration type = (TypeDeclaration) cu.types().get(0);
+        assertEquals(
+                List.of(),
+                service.parseEndpointsForType(type, cu, "com.example", "A.java", "A.java", null));
     }
 
     @Test
@@ -333,8 +348,7 @@ class EndpointParsingServiceTest {
                         }
                         """);
         TypeDeclaration type = (TypeDeclaration) cu.types().get(1);
-        EndpointParsingService service = new EndpointParsingService();
-        service.init();
+        EndpointParsingService service = new EndpointParsingService(List.of(REST_TEMPLATE), List.of(), false);
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(

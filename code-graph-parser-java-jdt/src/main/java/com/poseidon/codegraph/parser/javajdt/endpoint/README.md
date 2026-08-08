@@ -1,78 +1,66 @@
 # Endpoint Parsing
 
-Graph-engine no longer owns a YAML endpoint rule engine. Endpoint extraction now uses the shared Java static extract modules:
+Graph-engine no longer owns a YAML endpoint rule engine. Endpoint extraction uses the shared **static-extract-java** modules (latest):
 
-1. `java-static-extract-core` parses `.ser` files into rule models.
-2. `java-static-extract-jdt` executes those rules on JDT AST nodes.
-3. `code-graph-core` maps extracted endpoint labels and fields to graph endpoint classes.
+1. `static-extract-java-core` parses SER text into rule models (`AntlrSerRuleParser`).
+2. `static-extract-java-jdt` executes those rules on JDT AST nodes (`DefaultJdtStaticExtractEngine`).
+3. `StaticExtractEndpointMapper` maps extract results to graph endpoint classes.
 
 ## Runtime Flow
 
 ```text
-EndpointParsingService
-  -> SerRuleLoader
+ParseRequest.ruleSources (+ optional externalValues)
+  -> EndpointParsingService (AntlrSerRuleParser)
   -> DefaultJdtStaticExtractEngine
   -> StaticExtractResult
   -> StaticExtractEndpointMapper
   -> CodeEndpoint / HttpEndpoint / MqEndpoint / RedisEndpoint / DbEndpoint
 ```
 
-## Rule Files
+## Rules: caller-supplied only
 
-Built-in rules live in this module:
+**static-extract-java no longer ships built-in SER rules.** The engine does not load classpath `static-extract/` resources either. Callers must pass SER text via:
 
-```text
-code-graph-parser-java-jdt/src/main/resources/static-extract/
-```
+- `ParseRequest.ruleSources` (process / SPI parse path)
+- `EndpointParsingService` constructors / `setRuleSources(...)`
+- `CreateFileNodesRequest.serRuleSources` (if used by higher layers)
 
-`rules/index.txt` and `traces/index.txt` list enabled files.
+`ParseRequest.options.includeBuiltinRules` is accepted for API compatibility but **ignored** (always treated as no builtins). A warning is logged if set to `true`.
 
-`rules/index.txt` 和 `traces/index.txt` 控制哪些内置规则启用。
+`traceRuleSources` is legacy. Standalone `.trace` documents are not loaded. Put value-trace patches inside the same rule with an embedded `trace { ... }` block (see RestTemplate example below). If a “trace” source actually contains a full `rule ...`, it is still accepted as a rule document.
 
-Current built-ins:
+External config dictionaries are **per call** via `externalValues` / `MapExternalValueResolver` (e.g. namespace `config` for `@Value` placeholder lookup).
 
-当前内置规则：
+## SER shape
 
-- Spring MVC HTTP inbound endpoints.
-- Spring MVC HTTP 入站端点。
-- RestTemplate HTTP outbound endpoints.
-- RestTemplate HTTP 出站端点。
-- Spring config trace for `@Value` and `Environment.getProperty`.
-- Spring 配置追踪，支持 `@Value` 和 `Environment.getProperty`。
+Each source string may contain one or more `rule "..." ...` documents. A new document starts at a line beginning with `rule `. Embedded `trace { }` stays with its rule.
 
-Built-ins are enabled by default. External SER strings are appended to built-ins unless `ParseRequest.options.includeBuiltinRules` is set to `false`.
-
-内置规则默认启用。外部传入的 SER 字符串默认会追加到内置规则后面；如果 `ParseRequest.options.includeBuiltinRules` 设置为 `false`，则只使用外部规则。
-
-External SER strings may contain multiple `rule` and `trace` blocks in the same text. The parser separates blocks before execution, so callers can pass one generated SER document through `ParseRequest.ruleSources` or `CreateFileNodesRequest.serRuleSources`.
-
-外部 SER 字符串可以在同一段文本里同时包含多个 `rule` 和 `trace` 块。解析器会先按块拆开再执行，所以调用方可以把模型生成的一整份 SER 文档直接放进 `ParseRequest.ruleSources` 或 `CreateFileNodesRequest.serRuleSources`。
-
-A Spring MVC inbound rule looks like:
-
-Spring MVC 入站规则示例：
+Spring MVC inbound:
 
 ```ser
 rule "Spring MVC HTTP Inbound"
 endpoint HTTP inbound
 
-find method with annotation @*Mapping
+find method
+when annotation @*Mapping on method
 
 let basePath =
-  from annotation on class @RequestMapping take attr(value)
-  from annotation on class @RequestMapping take attr(path)
-  default ""
-
+  from annotation @RequestMapping on class take attr(value)
+  from annotation @RequestMapping on class take attr(path)
+  fallback ""
 let methodPath =
-  from annotation on method @*Mapping take attr(value)
-  from annotation on method @*Mapping take attr(path)
-  default ""
-
+  from annotation @*Mapping on method take attr(value)
+  from annotation @*Mapping on method take attr(path)
+  fallback ""
 let httpMethod =
-  from annotation on method @*Mapping take name
+  from annotation @*Mapping on method take name
   map {
     GetMapping: GET
     PostMapping: POST
+    PutMapping: PUT
+    DeleteMapping: DELETE
+    PatchMapping: PATCH
+    RequestMapping: GET
   }
 
 build {
@@ -80,6 +68,61 @@ build {
   path: concat(basePath, methodPath) | normalize slash | normalize pathVariable
 }
 ```
+
+RestTemplate outbound with embedded config trace:
+
+```ser
+rule "RestTemplate HTTP Outbound"
+endpoint HTTP outbound
+
+find call RestTemplate.[getForObject,getForEntity,postForObject,postForEntity,put,delete]
+
+let rawUrl =
+  from argument[0] take value
+
+let httpMethod =
+  from method take name
+  map {
+    getForObject: GET
+    getForEntity: GET
+    postForObject: POST
+    postForEntity: POST
+    put: PUT
+    delete: DELETE
+  }
+
+build {
+  httpMethod: httpMethod
+  path: rawUrl | normalize extractPath | normalize pathVariable
+}
+
+trace {
+  from field
+  when annotation @Value on field
+
+  let rawValue =
+    from annotation @Value on field take attr(value)
+
+  build {
+    namespace: "config"
+    lookup: rawValue | normalize placeholderLookup
+    default: rawValue | normalize placeholderDefault
+  }
+
+  from call
+  when method Environment.getProperty
+
+  let configLookup =
+    from argument[0] take value
+
+  build {
+    namespace: "config"
+    lookup: configLookup
+  }
+}
+```
+
+Vocabulary and more examples: `static-extract-java` repo (`jdt/vocabulary.md`, `examples/`).
 
 ## Graph Mapping
 
