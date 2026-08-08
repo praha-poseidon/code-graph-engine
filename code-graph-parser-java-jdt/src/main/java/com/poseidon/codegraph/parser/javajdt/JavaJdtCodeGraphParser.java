@@ -83,22 +83,8 @@ public class JavaJdtCodeGraphParser implements CodeGraphParser {
                 && (request.traceRuleSources() == null || request.traceRuleSources().isEmpty())) {
             return null;
         }
-        return new EndpointParsingService(
-                request.ruleSources(),
-                request.traceRuleSources(),
-                includeBuiltinRules(request));
-    }
-
-    private boolean includeBuiltinRules(ParseRequest request) {
-        Object value = request.options() != null ? request.options().get("includeBuiltinRules") : null;
-        if (value instanceof Boolean bool) {
-            return bool;
-        }
-        if (value instanceof String text && !text.isBlank()) {
-            return Boolean.parseBoolean(text);
-        }
-        // static-extract-java no longer ships built-in SER rules
-        return false;
+        // No built-in SER rules in the engine; only caller-supplied texts.
+        return new EndpointParsingService(request.ruleSources(), request.traceRuleSources());
     }
 
     private String projectFilePath(ParseRequest request, String sourceFile) {

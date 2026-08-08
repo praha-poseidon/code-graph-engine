@@ -19,13 +19,13 @@ ParseRequest.ruleSources (+ optional externalValues)
 
 ## Rules: caller-supplied only
 
-**static-extract-java no longer ships built-in SER rules.** The engine does not load classpath `static-extract/` resources either. Callers must pass SER text via:
+**The engine has no built-in SER rules** (no classpath `static-extract/` resources, no default Spring/RestTemplate rules). Without caller-supplied SER text, endpoint extraction yields nothing.
+
+Pass SER via:
 
 - `ParseRequest.ruleSources` (process / SPI parse path)
 - `EndpointParsingService` constructors / `setRuleSources(...)`
-- `CreateFileNodesRequest.serRuleSources` (if used by higher layers)
-
-`ParseRequest.options.includeBuiltinRules` is accepted for API compatibility but **ignored** (always treated as no builtins). A warning is logged if set to `true`.
+- `CreateFileNodesRequest.serRuleSources` (HTTP app API)
 
 `traceRuleSources` is legacy. Standalone `.trace` documents are not loaded. Put value-trace patches inside the same rule with an embedded `trace { ... }` block (see RestTemplate example below). If a “trace” source actually contains a full `rule ...`, it is still accepted as a rule document.
 

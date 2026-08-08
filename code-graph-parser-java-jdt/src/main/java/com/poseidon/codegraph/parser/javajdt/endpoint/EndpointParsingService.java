@@ -5,7 +5,6 @@ import com.poseidon.codegraph.parser.javajdt.endpoint.mapper.StaticExtractEndpoi
 import com.poseidon.javastatic.extract.jdt.DefaultJdtStaticExtractEngine;
 import com.poseidon.javastatic.extract.jdt.JdtStaticExtractEngine;
 import com.poseidon.javastatic.extract.jdt.StaticExtractResult;
-import com.poseidon.javastatic.extract.jdt.load.SerRuleLoader;
 import com.poseidon.javastatic.extract.jdt.trace.JdtTraceOptions;
 import com.poseidon.javastatic.extract.jdt.trace.external.MapExternalValueResolver;
 import com.poseidon.javastatic.extract.language.AntlrSerRuleParser;
@@ -25,69 +24,39 @@ import java.util.Map;
 /**
  * Runs static-extract-java SER rules on JDT AST and maps results to graph endpoints.
  *
- * <p>Uses the current static-extract-java model:
+ * <p>This service ships <strong>no built-in rules</strong>. Rules come only from the caller:
  * <ul>
- *   <li>No built-in SER rules (caller supplies text or empty list).</li>
- *   <li>Value-trace lives in the same rule as optional {@code trace { ... }}.</li>
- *   <li>External config dictionary is per-call via {@code externalValues}.</li>
+ *   <li>SER text via constructors / {@link #setRuleSources}</li>
+ *   <li>Value-trace as optional embedded {@code trace { ... }} in the same rule text</li>
+ *   <li>External config dictionary per call via {@code externalValues}</li>
  * </ul>
  */
 @Service
 @Slf4j
 public class EndpointParsingService {
 
-    private final SerRuleLoader staticRuleLoader;
-    private final JdtStaticExtractEngine staticExtractEngine;
     private final SerRuleParser serRuleParser;
-
     private List<StaticExtractRule> staticRules = List.of();
 
     public EndpointParsingService() {
-        this(new SerRuleLoader(), new DefaultJdtStaticExtractEngine());
-    }
-
-    public EndpointParsingService(SerRuleLoader staticRuleLoader, JdtStaticExtractEngine staticExtractEngine) {
-        this.staticRuleLoader = staticRuleLoader != null ? staticRuleLoader : new SerRuleLoader();
-        this.staticExtractEngine = staticExtractEngine != null ? staticExtractEngine : new DefaultJdtStaticExtractEngine();
         this.serRuleParser = new AntlrSerRuleParser();
     }
 
+    public EndpointParsingService(List<String> endpointRuleSources) {
+        this(endpointRuleSources, List.of());
+    }
+
     public EndpointParsingService(List<String> endpointRuleSources, List<String> traceRuleSources) {
-        this(endpointRuleSources, traceRuleSources, false);
-    }
-
-    public EndpointParsingService(
-            List<String> endpointRuleSources,
-            List<String> traceRuleSources,
-            boolean includeBuiltinRules) {
-        this(new SerRuleLoader(), new DefaultJdtStaticExtractEngine(), endpointRuleSources, traceRuleSources, includeBuiltinRules);
-    }
-
-    public EndpointParsingService(
-            SerRuleLoader staticRuleLoader,
-            JdtStaticExtractEngine staticExtractEngine,
-            List<String> endpointRuleSources,
-            List<String> traceRuleSources) {
-        this(staticRuleLoader, staticExtractEngine, endpointRuleSources, traceRuleSources, false);
-    }
-
-    public EndpointParsingService(
-            SerRuleLoader staticRuleLoader,
-            JdtStaticExtractEngine staticExtractEngine,
-            List<String> endpointRuleSources,
-            List<String> traceRuleSources,
-            boolean includeBuiltinRules) {
-        this(staticRuleLoader, staticExtractEngine);
-        setRuleSources(endpointRuleSources, traceRuleSources, includeBuiltinRules);
+        this();
+        setRuleSources(endpointRuleSources, traceRuleSources);
     }
 
     @PostConstruct
     public void init() {
-        // Built-ins removed from static-extract-java. Rules come only from setRuleSources / parse request.
         if (staticRules == null) {
             staticRules = List.of();
         }
-        log.info("端点解析服务初始化完成，当前 SER 规则 {} 条（无内置规则；由调用方传入）", staticRules.size());
+        log.info("端点解析服务初始化完成，当前 SER 规则 {} 条（无内置；仅调用方传入）", staticRules.size());
     }
 
     /**
@@ -95,24 +64,14 @@ public class EndpointParsingService {
      * optional embedded {@code trace { }} is parsed with the rule (not as a separate file).
      *
      * <p>{@code traceRuleSources} is accepted for API compatibility but ignored for standalone
-     * {@code .trace} documents — put patches inside the same rule file.
+     * {@code .trace} documents — put patches inside the same rule file. If a "trace" source
+     * actually contains a full {@code rule ...}, it is treated as a rule document.
      */
     public final void setRuleSources(List<String> endpointRuleSources, List<String> traceRuleSources) {
-        setRuleSources(endpointRuleSources, traceRuleSources, false);
-    }
-
-    public final void setRuleSources(
-            List<String> endpointRuleSources,
-            List<String> traceRuleSources,
-            boolean includeBuiltinRules) {
-        if (includeBuiltinRules) {
-            log.warn("includeBuiltinRules=true ignored: static-extract-java no longer ships built-in SER rules");
-        }
         List<String> sources = new ArrayList<>();
         if (endpointRuleSources != null) {
             sources.addAll(endpointRuleSources);
         }
-        // Legacy: if someone still passes full rule+trace as "trace" list, try parse as rules too
         if (traceRuleSources != null) {
             for (String source : traceRuleSources) {
                 if (source != null && source.contains("rule ")) {
@@ -156,9 +115,6 @@ public class EndpointParsingService {
         StringBuilder current = null;
         for (String line : source.split("\\R", -1)) {
             String trimmed = line.trim();
-            if (trimmed.startsWith("rule ") && (trimmed.length() == 5 || !Character.isLetterOrDigit(trimmed.charAt(5)))) {
-                // "rule " + quote or space
-            }
             boolean newRule = trimmed.startsWith("rule \"") || trimmed.matches("rule\\s+\".*");
             if (!newRule && trimmed.startsWith("rule ") && trimmed.length() > 5) {
                 newRule = true;
@@ -238,7 +194,6 @@ public class EndpointParsingService {
     private JdtStaticExtractEngine engineFor(Map<String, Map<String, List<String>>> externalValues) {
         MapExternalValueResolver resolver =
                 new MapExternalValueResolver(externalValues != null ? externalValues : Map.of());
-        // Standalone trace rule sets removed; embedded traces are merged per-rule in the extract engine.
         JdtTraceOptions options = JdtTraceOptions.of(List.of(), resolver).withExtractRules(staticRules);
         return new DefaultJdtStaticExtractEngine(options, staticRules);
     }

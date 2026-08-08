@@ -122,7 +122,7 @@ class EndpointParsingServiceTest {
                         }
                         """);
         TypeDeclaration type = (TypeDeclaration) cu.types().get(0);
-        EndpointParsingService service = new EndpointParsingService(List.of(SPRING_MVC), List.of(), false);
+        EndpointParsingService service = new EndpointParsingService(List.of(SPRING_MVC), List.of());
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
@@ -167,7 +167,7 @@ class EndpointParsingServiceTest {
                         }
                         """);
         TypeDeclaration type = (TypeDeclaration) cu.types().get(1);
-        EndpointParsingService service = new EndpointParsingService(List.of(REST_TEMPLATE), List.of(), false);
+        EndpointParsingService service = new EndpointParsingService(List.of(REST_TEMPLATE), List.of());
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
@@ -208,7 +208,7 @@ class EndpointParsingServiceTest {
                         }
                         """);
         TypeDeclaration type = (TypeDeclaration) cu.types().get(0);
-        EndpointParsingService service = new EndpointParsingService(List.of(SPRING_MVC), List.of(), false);
+        EndpointParsingService service = new EndpointParsingService(List.of(SPRING_MVC), List.of());
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
@@ -250,7 +250,7 @@ class EndpointParsingServiceTest {
                         }
                         """);
         TypeDeclaration type = (TypeDeclaration) cu.types().get(1);
-        EndpointParsingService service = new EndpointParsingService(List.of(REST_TEMPLATE), List.of(), false);
+        EndpointParsingService service = new EndpointParsingService(List.of(REST_TEMPLATE), List.of());
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
@@ -290,7 +290,7 @@ class EndpointParsingServiceTest {
                         }
                         """);
         TypeDeclaration type = (TypeDeclaration) cu.types().get(0);
-        EndpointParsingService service = new EndpointParsingService(List.of(SPRING_MVC), List.of(), false);
+        EndpointParsingService service = new EndpointParsingService(List.of(SPRING_MVC), List.of());
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
@@ -310,14 +310,14 @@ class EndpointParsingServiceTest {
 
     @Test
     void reportsEndpointRuleSourceIndexWhenExternalSerIsInvalid() {
-        assertThatThrownBy(() -> new EndpointParsingService(List.of("broken rule"), List.of(), false))
+        assertThatThrownBy(() -> new EndpointParsingService(List.of("broken rule"), List.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid endpoint SER rule source at index 0");
     }
 
     @Test
     void emptyRulesYieldNoEndpoints() {
-        EndpointParsingService service = new EndpointParsingService(List.of(), List.of(), false);
+        EndpointParsingService service = new EndpointParsingService(List.of(), List.of());
         service.init();
         CompilationUnit cu = parse("package com.example; class A {}");
         TypeDeclaration type = (TypeDeclaration) cu.types().get(0);
@@ -348,7 +348,7 @@ class EndpointParsingServiceTest {
                         }
                         """);
         TypeDeclaration type = (TypeDeclaration) cu.types().get(1);
-        EndpointParsingService service = new EndpointParsingService(List.of(REST_TEMPLATE), List.of(), false);
+        EndpointParsingService service = new EndpointParsingService(List.of(REST_TEMPLATE), List.of());
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
