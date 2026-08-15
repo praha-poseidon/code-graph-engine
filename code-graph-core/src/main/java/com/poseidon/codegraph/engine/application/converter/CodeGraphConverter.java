@@ -117,6 +117,7 @@ public class CodeGraphConverter {
             case MQ:
                 MqEndpoint mq = new MqEndpoint();
                 mq.setTopic(dobj.getTopic());
+                mq.setGroup(dobj.getGroup());
                 mq.setOperation(dobj.getOperation());
                 mq.setBrokerType(dobj.getBrokerType());
                 domain = mq;
@@ -289,6 +290,7 @@ public class CodeGraphConverter {
         } else if (domain instanceof MqEndpoint) {
             MqEndpoint mq = (MqEndpoint) domain;
             dobj.setTopic(mq.getTopic());
+            dobj.setGroup(mq.getGroup());
             dobj.setOperation(mq.getOperation());
             dobj.setBrokerType(mq.getBrokerType());
         } else if (domain instanceof RedisEndpoint) {
