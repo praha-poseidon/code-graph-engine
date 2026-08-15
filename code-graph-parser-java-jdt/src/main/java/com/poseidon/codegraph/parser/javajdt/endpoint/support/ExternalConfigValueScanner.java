@@ -24,6 +24,9 @@ public final class ExternalConfigValueScanner {
 
     public static final String CONFIG_NAMESPACE = "config";
 
+    private static final Map<String, Map<String, Map<String, List<String>>>> CACHE =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
     private ExternalConfigValueScanner() {}
 
     public static Map<String, Map<String, List<String>>> scan(String absoluteFilePath, String projectFilePath) {
@@ -31,15 +34,41 @@ public final class ExternalConfigValueScanner {
         if (root == null || !Files.isDirectory(root)) {
             return Map.of();
         }
+        return scanProjectRoot(root);
+    }
+
+    /** 按项目根扫描（分析入口可显式调用一次）。 */
+    public static Map<String, Map<String, List<String>>> scanProjectRoot(Path projectRoot) {
+        if (projectRoot == null || !Files.isDirectory(projectRoot)) {
+            return Map.of();
+        }
+        String cacheKey = projectRoot.toAbsolutePath().normalize().toString();
+        return CACHE.computeIfAbsent(cacheKey, ignored -> scanRoot(projectRoot));
+    }
+
+    public static void clearCache() {
+        CACHE.clear();
+    }
+
+    public static void clearCache(Path projectRoot) {
+        if (projectRoot != null) {
+            CACHE.remove(projectRoot.toAbsolutePath().normalize().toString());
+        }
+    }
+
+    private static Map<String, Map<String, List<String>>> scanRoot(Path root) {
         Map<String, List<String>> configValues = new LinkedHashMap<>();
         for (Path file : configFiles(root)) {
             readConfigFile(file, configValues);
         }
         if (configValues.isEmpty()) {
+            log.info("未扫描到 application/bootstrap 配置: root={}", root);
             return Map.of();
         }
-        log.debug("扫描到配置外部值: root={}, keys={}", root, configValues.size());
-        return Map.of(CONFIG_NAMESPACE, configValues);
+        log.info("扫描项目配置外部值(已缓存): root={}, keys={}", root, configValues.size());
+        Map<String, List<String>> frozen = new LinkedHashMap<>();
+        configValues.forEach((k, v) -> frozen.put(k, List.copyOf(v)));
+        return Map.of(CONFIG_NAMESPACE, Map.copyOf(frozen));
     }
 
     private static Path resolveProjectRoot(String absoluteFilePath, String projectFilePath) {
