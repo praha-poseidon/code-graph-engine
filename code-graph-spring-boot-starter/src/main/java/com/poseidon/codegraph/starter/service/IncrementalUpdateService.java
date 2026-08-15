@@ -13,6 +13,7 @@ import com.poseidon.codegraph.spi.CodeGraphParserRegistry;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -223,12 +224,22 @@ public class IncrementalUpdateService {
                                    String[] classpathEntries, String[] sourcepathEntries,
                                    List<String> endpointRuleSources,
                                    List<String> traceRuleSources) {
+        handleFileModified(projectName, absoluteFilePath, projectFilePath, gitRepoUrl, gitBranch,
+                classpathEntries, sourcepathEntries, endpointRuleSources, traceRuleSources, null);
+    }
+
+    public void handleFileModified(String projectName, String absoluteFilePath, String projectFilePath,
+                                   String gitRepoUrl, String gitBranch,
+                                   String[] classpathEntries, String[] sourcepathEntries,
+                                   List<String> endpointRuleSources,
+                                   List<String> traceRuleSources,
+                                   Map<String, Map<String, List<String>>> externalValues) {
         log.info("处理文件修改: absolutePath={}, projectPath={}, classpathCount={}", absoluteFilePath, projectFilePath,
                  classpathEntries != null ? classpathEntries.length : 0);
         
         try {
             CodeGraphContext context = buildContext(projectName, absoluteFilePath, projectFilePath, gitRepoUrl, gitBranch,
-                    classpathEntries, sourcepathEntries, endpointRuleSources, traceRuleSources);
+                    classpathEntries, sourcepathEntries, endpointRuleSources, traceRuleSources, externalValues);
             context.setChangeType(ChangeType.SOURCE_MODIFIED);
             context.setOldProjectFilePath(projectFilePath);
             context.setNewProjectFilePath(projectFilePath);
@@ -248,7 +259,7 @@ public class IncrementalUpdateService {
                                           String gitRepoUrl, String gitBranch,
                                           String[] classpathEntries, String[] sourcepathEntries) {
         return buildContext(projectName, absoluteFilePath, projectFilePath, gitRepoUrl, gitBranch,
-                classpathEntries, sourcepathEntries, null, null);
+                classpathEntries, sourcepathEntries, null, null, null);
     }
 
     private CodeGraphContext buildContext(String projectName, String absoluteFilePath, String projectFilePath,
@@ -256,6 +267,16 @@ public class IncrementalUpdateService {
                                           String[] classpathEntries, String[] sourcepathEntries,
                                           List<String> endpointRuleSources,
                                           List<String> traceRuleSources) {
+        return buildContext(projectName, absoluteFilePath, projectFilePath, gitRepoUrl, gitBranch,
+                classpathEntries, sourcepathEntries, endpointRuleSources, traceRuleSources, null);
+    }
+
+    private CodeGraphContext buildContext(String projectName, String absoluteFilePath, String projectFilePath,
+                                          String gitRepoUrl, String gitBranch,
+                                          String[] classpathEntries, String[] sourcepathEntries,
+                                          List<String> endpointRuleSources,
+                                          List<String> traceRuleSources,
+                                          Map<String, Map<String, List<String>>> externalValues) {
         CodeGraphContext context = new CodeGraphContext();
         context.setProjectName(projectName);
         context.setAbsoluteFilePath(absoluteFilePath);
@@ -267,6 +288,7 @@ public class IncrementalUpdateService {
         context.setLanguage(inferLanguage(projectFilePath));
         context.setEndpointRuleSources(endpointRuleSources);
         context.setTraceRuleSources(traceRuleSources);
+        context.setExternalValues(externalValues);
         context.setParserRegistry(parserRegistry);
         
         // ========== 查询函数 (Reader) ==========
