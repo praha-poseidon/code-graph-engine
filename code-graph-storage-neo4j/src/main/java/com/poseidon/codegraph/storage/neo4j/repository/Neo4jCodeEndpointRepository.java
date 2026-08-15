@@ -51,6 +51,7 @@ public class Neo4jCodeEndpointRepository implements CodeEndpointRepository {
                 e.path = endpoint.path,
                 e.normalizedPath = endpoint.normalizedPath,
                 e.topic = endpoint.topic,
+                e.group = endpoint.group,
                 e.operation = endpoint.operation,
                 e.brokerType = endpoint.brokerType,
                 e.keyPattern = endpoint.keyPattern,
@@ -98,6 +99,7 @@ public class Neo4jCodeEndpointRepository implements CodeEndpointRepository {
                 e.path = endpoint.path,
                 e.normalizedPath = endpoint.normalizedPath,
                 e.topic = endpoint.topic,
+                e.group = endpoint.group,
                 e.operation = endpoint.operation,
                 e.brokerType = endpoint.brokerType,
                 e.keyPattern = endpoint.keyPattern,
@@ -247,6 +249,7 @@ public class Neo4jCodeEndpointRepository implements CodeEndpointRepository {
             endpoint.setPath(node.get("path").asString(null));
             endpoint.setNormalizedPath(node.get("normalizedPath").asString(null));
             endpoint.setTopic(node.get("topic").asString(null));
+            endpoint.setGroup(node.get("group").asString(null));
             endpoint.setOperation(node.get("operation").asString(null));
             endpoint.setBrokerType(node.get("brokerType").asString(null));
             endpoint.setKeyPattern(node.get("keyPattern").asString(null));
@@ -288,6 +291,7 @@ public class Neo4jCodeEndpointRepository implements CodeEndpointRepository {
         map.put("path", endpoint.getPath());
         map.put("normalizedPath", endpoint.getNormalizedPath());
         map.put("topic", endpoint.getTopic());
+        map.put("group", endpoint.getGroup());
         map.put("operation", endpoint.getOperation());
         map.put("brokerType", endpoint.getBrokerType());
         map.put("keyPattern", endpoint.getKeyPattern());
