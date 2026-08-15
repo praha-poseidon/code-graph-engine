@@ -221,7 +221,8 @@ public class JdtSourceCodeParser extends AbstractSourceCodeParser {
     }
 
     private Map<String, Map<String, List<String>>> resolveExternalValues(String absoluteFilePath, String projectFilePath) {
-        if (externalValues != null && !externalValues.isEmpty()) {
+        // non-null means caller already resolved (even empty = do not re-scan)
+        if (externalValues != null) {
             return externalValues;
         }
         return ExternalConfigValueScanner.scan(absoluteFilePath, projectFilePath);
