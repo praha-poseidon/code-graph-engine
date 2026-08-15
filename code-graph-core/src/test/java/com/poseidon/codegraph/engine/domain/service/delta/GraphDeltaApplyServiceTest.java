@@ -349,6 +349,41 @@ class GraphDeltaApplyServiceTest {
             .containsExactly("demo::com.poseidon.User");
     }
 
+    @Test
+    void deduplicatesDuplicateCallsEdgesBeforeValidate() {
+        GraphDeltaApplyService service = new GraphDeltaApplyService();
+        CodeGraphContext context = new CodeGraphContext();
+        context.setProjectName("demo");
+        List<CodeRelationship> inserted = new ArrayList<>();
+
+        // Same caller/callee/type twice (two call sites) — same relationship id.
+        CodeRelationship first = relationship("fn.A.m()", "fn.A.helper()", RelationshipType.CALLS);
+        first.setLineNumber(10);
+        CodeRelationship second = relationship("fn.A.m()", "fn.A.helper()", RelationshipType.CALLS);
+        second.setLineNumber(20);
+
+        context.getReader().setFindExistingStructureRelationships(rels -> java.util.Set.of());
+        context.getWriter().setInsertRelationshipsBatch(inserted::addAll);
+
+        GraphDelta delta = new GraphDelta(
+            null,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(first, second),
+            List.of(),
+            List.of(),
+            List.of());
+
+        // Must not throw GraphDeltaValidationException (relationship.duplicate).
+        service.apply(delta, context);
+
+        assertEquals(1, inserted.size());
+        assertEquals(RelationshipType.CALLS, inserted.get(0).getRelationshipType());
+        assertEquals(10, inserted.get(0).getLineNumber());
+    }
+
     private CodeUnit unit(String id) {
         CodeUnit unit = new CodeUnit();
         unit.setId(id);
