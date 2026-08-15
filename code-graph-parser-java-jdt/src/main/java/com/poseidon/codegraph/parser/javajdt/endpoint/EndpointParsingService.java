@@ -28,7 +28,7 @@ import java.util.Map;
  * <ul>
  *   <li>SER text via constructors / {@link #setRuleSources}</li>
  *   <li>Value-trace as optional embedded {@code trace { ... }} in the same rule text</li>
- *   <li>External config dictionary per call via {@code externalValues}</li>
+ *   <li>External / SER-embedded identity dict via {@code externalValues} and static-extract dict {}</li>
  * </ul>
  */
 @Service
@@ -59,14 +59,6 @@ public class EndpointParsingService {
         log.info("端点解析服务初始化完成，当前 SER 规则 {} 条（无内置；仅调用方传入）", staticRules.size());
     }
 
-    /**
-     * Install SER rule texts. Each source may contain one or more {@code rule "..." ...} documents;
-     * optional embedded {@code trace { }} is parsed with the rule (not as a separate file).
-     *
-     * <p>{@code traceRuleSources} is accepted for API compatibility but ignored for standalone
-     * {@code .trace} documents — put patches inside the same rule file. If a "trace" source
-     * actually contains a full {@code rule ...}, it is treated as a rule document.
-     */
     public final void setRuleSources(List<String> endpointRuleSources, List<String> traceRuleSources) {
         List<String> sources = new ArrayList<>();
         if (endpointRuleSources != null) {
@@ -106,10 +98,6 @@ public class EndpointParsingService {
         return rules;
     }
 
-    /**
-     * Split one text blob into one-or-more rule documents. A new document starts at a line beginning
-     * with {@code rule }. Embedded {@code trace { }} stays inside the same document.
-     */
     static List<String> splitRuleDocuments(String source) {
         List<String> docs = new ArrayList<>();
         StringBuilder current = null;
@@ -139,7 +127,6 @@ public class EndpointParsingService {
         return docs;
     }
 
-    /** @deprecated prefer parseEndpointsForType */
     @Deprecated
     public List<CodeEndpoint> parseEndpoints(
             CompilationUnit cu,
@@ -160,7 +147,8 @@ public class EndpointParsingService {
             String fileName,
             String projectFilePath,
             String absoluteFilePath) {
-        return parseEndpointsForType(typeDecl, cu, packageName, fileName, projectFilePath, absoluteFilePath, Map.of());
+        return parseEndpointsForType(
+                typeDecl, cu, packageName, fileName, projectFilePath, absoluteFilePath, Map.of(), null);
     }
 
     public List<CodeEndpoint> parseEndpointsForType(
@@ -171,13 +159,29 @@ public class EndpointParsingService {
             String projectFilePath,
             String absoluteFilePath,
             Map<String, Map<String, List<String>>> externalValues) {
+        return parseEndpointsForType(
+                typeDecl, cu, packageName, fileName, projectFilePath, absoluteFilePath, externalValues, null);
+    }
+
+    public List<CodeEndpoint> parseEndpointsForType(
+            TypeDeclaration typeDecl,
+            CompilationUnit cu,
+            String packageName,
+            String fileName,
+            String projectFilePath,
+            String absoluteFilePath,
+            Map<String, Map<String, List<String>>> externalValues,
+            String projectName) {
         if (staticRules == null || staticRules.isEmpty()) {
             log.debug("没有可用的静态提取规则");
             return Collections.emptyList();
         }
         List<CodeEndpoint> out = new ArrayList<>();
-        JdtStaticExtractEngine engine = engineFor(externalValues);
+        JdtStaticExtractEngine engine = engineFor(externalValues, projectName);
         for (StaticExtractRule rule : staticRules) {
+            if (rule.endpoint() == null) {
+                continue;
+            }
             List<StaticExtractResult> results =
                     engine.execute(rule, cu, typeDecl, projectFilePath, absoluteFilePath);
             for (StaticExtractResult result : results) {
@@ -191,11 +195,12 @@ public class EndpointParsingService {
         return out;
     }
 
-    private JdtStaticExtractEngine engineFor(Map<String, Map<String, List<String>>> externalValues) {
+    private JdtStaticExtractEngine engineFor(
+            Map<String, Map<String, List<String>>> externalValues, String projectName) {
         MapExternalValueResolver resolver =
                 new MapExternalValueResolver(externalValues != null ? externalValues : Map.of());
         JdtTraceOptions options = JdtTraceOptions.of(List.of(), resolver).withExtractRules(staticRules);
-        return new DefaultJdtStaticExtractEngine(options, staticRules);
+        return new DefaultJdtStaticExtractEngine(options, staticRules, projectName);
     }
 
     private static TypeDeclaration topTypeDeclaration(CompilationUnit cu) {
