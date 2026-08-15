@@ -32,8 +32,10 @@ public class CodeEndpointDO {
     
     // MQ 相关
     private String topic;
+    /** Consumer group (consume); not MATCHES identity */
+    private String group;
     private String operation;
-    private String brokerType; // KAFKA, ROCKETMQ
+    private String brokerType; // KAFKA, ROCKETMQ, DDMQ
     
     // Redis 相关
     private String keyPattern;
