@@ -47,6 +47,10 @@ public class GraphDeltaApplyService {
         }
         delta = projectScopeNormalizer.normalize(delta, context.getProjectName());
         delta = deduplicateEndpoints(delta);
+        // Parser may emit the same CALLS (or other) edge twice when the same callee is
+        // invoked at multiple sites; relationship id is (from,type,to) without line.
+        // Dedupe before validate so whole-file apply is not rejected.
+        delta = deduplicateRelationships(delta);
         validator.validateOrThrow(delta);
         logDiagnostics(delta);
         applyDeletes(delta, context);
@@ -162,6 +166,77 @@ public class GraphDeltaApplyService {
             delta.deletedNodeIds(),
             delta.deletedRelationshipIds(),
             delta.diagnostics());
+    }
+
+    /**
+     * Keep first relationship for each identity key used by {@link GraphDeltaValidator}:
+     * relationship id, and (fromNodeId, toNodeId, type).
+     */
+    private GraphDelta deduplicateRelationships(GraphDelta delta) {
+        List<CodeRelationship> relationships = safeList(delta.relationships());
+        if (relationships.size() < 2) {
+            return delta;
+        }
+
+        Map<String, CodeRelationship> unique = new LinkedHashMap<>();
+        int skipped = 0;
+        for (CodeRelationship rel : relationships) {
+            if (rel == null) {
+                skipped++;
+                continue;
+            }
+            String idKey = (rel.getId() != null && !rel.getId().isBlank())
+                ? "id:" + rel.getId()
+                : null;
+            String typeName = rel.getRelationshipType() != null ? rel.getRelationshipType().name() : "";
+            String edgeKey = "key:"
+                + nullToEmpty(rel.getFromNodeId()) + ":"
+                + nullToEmpty(rel.getToNodeId()) + ":"
+                + typeName;
+
+            if (idKey != null && unique.containsKey(idKey)) {
+                skipped++;
+                continue;
+            }
+            if (unique.containsKey(edgeKey)) {
+                skipped++;
+                continue;
+            }
+            // Index under both keys so either form of duplicate is collapsed.
+            CodeRelationship kept = rel;
+            if (idKey != null) {
+                unique.put(idKey, kept);
+            }
+            unique.put(edgeKey, kept);
+        }
+
+        // Rebuild list without double-counting entries stored under two keys.
+        Map<CodeRelationship, Boolean> ordered = new LinkedHashMap<>();
+        for (CodeRelationship rel : unique.values()) {
+            ordered.putIfAbsent(rel, Boolean.TRUE);
+        }
+        List<CodeRelationship> deduped = new ArrayList<>(ordered.keySet());
+
+        if (skipped == 0 && deduped.size() == relationships.size()) {
+            return delta;
+        }
+
+        log.info("关系预去重：原始 {} 条，去重后 {} 条（去掉 {} 条重复）",
+            relationships.size(), deduped.size(), relationships.size() - deduped.size());
+        return new GraphDelta(
+            delta.scope(),
+            delta.packages(),
+            delta.units(),
+            delta.functions(),
+            delta.endpoints(),
+            deduped,
+            delta.deletedNodeIds(),
+            delta.deletedRelationshipIds(),
+            delta.diagnostics());
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private void logDiagnostics(GraphDelta delta) {
