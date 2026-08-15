@@ -55,7 +55,9 @@ public final class StaticExtractEndpointMapper {
         endpoint.setIsExternal("outbound".equalsIgnoreCase(direction));
         endpoint.setProjectFilePath(projectFilePath);
         endpoint.setLanguage("java");
-        endpoint.setParseLevel("full");
+        // parseLevel may be set by static-extract identity dict (config); default full
+        String parseLevel = result.fields().get("parseLevel");
+        endpoint.setParseLevel(parseLevel != null && !parseLevel.isBlank() ? parseLevel : "full");
 
         ASTNode anchor = result.anchorNode();
         String functionId = extractFunctionId(anchor, cu, typeDecl);
@@ -77,6 +79,9 @@ public final class StaticExtractEndpointMapper {
         endpoint.setEndLine(lineEnd);
 
         for (Map.Entry<String, String> entry : result.fields().entrySet()) {
+            if ("parseLevel".equals(entry.getKey())) {
+                continue; // already applied above; not an endpoint bean property
+            }
             applyField(endpoint, entry.getKey(), entry.getValue());
         }
 
@@ -145,6 +150,12 @@ public final class StaticExtractEndpointMapper {
                 http.setHttpMethod("UNKNOWN");
             }
             if (http.getPath() == null || http.getPath().isBlank()) {
+                return;
+            }
+            // Identity from external dict (static-extract parseLevel=config) is already final —
+            // do not rewrite version segments etc.
+            if ("config".equals(endpoint.getParseLevel())) {
+                http.setNormalizedPath(http.getPath());
                 return;
             }
             String normalizedPath =
