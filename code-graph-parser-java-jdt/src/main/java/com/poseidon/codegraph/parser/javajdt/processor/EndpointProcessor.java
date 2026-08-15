@@ -72,7 +72,8 @@ public class EndpointProcessor implements ASTNodeProcessor {
                 extractFileName(context.getProjectFilePath()),
                 context.getProjectFilePath(),
                 context.getAbsoluteFilePath(),
-                context.getExternalValues()
+                context.getExternalValues(),
+                context.getProjectName()
             );
             
             if (endpoints.isEmpty()) {
