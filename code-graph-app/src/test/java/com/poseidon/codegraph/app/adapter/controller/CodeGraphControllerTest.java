@@ -31,6 +31,43 @@ class CodeGraphControllerTest {
     }
 
     @Test
+    void graphDeltaImportRejectsRemovedUiEndpointType() throws Exception {
+        var payload = new ObjectMapper().readTree("""
+            {
+              "scope": {
+                "projectName": "demo",
+                "language": "typescript",
+                "projectRoot": "/repo",
+                "sourceFiles": ["src/App.tsx"],
+                "changeType": "SOURCE_MODIFIED",
+                "attributes": {}
+              },
+              "packages": [],
+              "units": [],
+              "functions": [],
+              "endpoints": [{
+                "endpointKind": "ui",
+                "id": "ui:save",
+                "language": "typescript",
+                "projectName": "demo",
+                "projectFilePath": "src/App.tsx",
+                "endpointType": "UI"
+              }],
+              "relationships": [],
+              "deletedNodeIds": [],
+              "deletedRelationshipIds": [],
+              "diagnostics": []
+            }
+            """);
+
+        ApiResponse<Void> response = controller.applyGraphDelta(payload);
+
+        assertThat(response.getCode()).isEqualTo(500);
+        assertThat(response.getMessage()).contains("Could not resolve type id 'ui'");
+        verifyNoInteractions(service);
+    }
+
+    @Test
     void updateRejectsMissingAbsoluteFilePath() {
         CreateFileNodesRequest request = request();
         request.setAbsoluteFilePath(" ");

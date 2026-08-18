@@ -135,16 +135,6 @@ public class CodeGraphConverter {
                 db.setDbOperation(dobj.getDbOperation());
                 domain = db;
                 break;
-            case UI:
-                UiEndpoint ui = new UiEndpoint();
-                ui.setUiEvent(dobj.getUiEvent());
-                ui.setUiElement(dobj.getUiElement());
-                ui.setUiText(dobj.getUiText());
-                ui.setUiSelector(dobj.getUiSelector());
-                ui.setRoutePath(dobj.getRoutePath());
-                ui.setComponentName(dobj.getComponentName());
-                domain = ui;
-                break;
             default:
                 // 兜底方案
                 HttpEndpoint fallback = new HttpEndpoint();
@@ -302,14 +292,6 @@ public class CodeGraphConverter {
             DbEndpoint db = (DbEndpoint) domain;
             dobj.setTableName(db.getTableName());
             dobj.setDbOperation(db.getDbOperation());
-        } else if (domain instanceof UiEndpoint) {
-            UiEndpoint ui = (UiEndpoint) domain;
-            dobj.setUiEvent(ui.getUiEvent());
-            dobj.setUiElement(ui.getUiElement());
-            dobj.setUiText(ui.getUiText());
-            dobj.setUiSelector(ui.getUiSelector());
-            dobj.setRoutePath(ui.getRoutePath());
-            dobj.setComponentName(ui.getComponentName());
         }
         
         return dobj;

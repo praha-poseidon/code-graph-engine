@@ -142,21 +142,21 @@ class CodeGraphAppEndToEndTest {
                 "signature", "saveUser()"
             )),
             "endpoints", List.of(Map.ofEntries(
-                Map.entry("id", "frontend-demo#src/pages/UserPage.tsx::endpoint:UI:CLICK:button:Save"),
-                Map.entry("name", "UI:CLICK:button:Save"),
-                Map.entry("qualifiedName", "frontend-demo#src/pages/UserPage.tsx::endpoint:UI:CLICK:button:Save"),
+                Map.entry("id", "frontend-demo#src/pages/UserPage.tsx::endpoint:HTTP:POST:/api/users"),
+                Map.entry("name", "HTTP:POST:/api/users"),
+                Map.entry("qualifiedName", "frontend-demo#src/pages/UserPage.tsx::endpoint:HTTP:POST:/api/users"),
                 Map.entry("language", "typescript"),
                 Map.entry("projectFilePath", "src/pages/UserPage.tsx"),
                 Map.entry("startLine", 5),
                 Map.entry("endLine", 5),
-                Map.entry("endpointType", "UI"),
-                Map.entry("direction", "inbound"),
-                Map.entry("isExternal", false),
+                Map.entry("endpointType", "HTTP"),
+                Map.entry("direction", "outbound"),
+                Map.entry("isExternal", true),
                 Map.entry("parseLevel", "full"),
-                Map.entry("matchIdentity", "UI:CLICK:button:Save"),
-                Map.entry("uiEvent", "click"),
-                Map.entry("uiElement", "button"),
-                Map.entry("uiText", "Save")
+                Map.entry("matchIdentity", "HTTP:POST:/api/users"),
+                Map.entry("httpMethod", "POST"),
+                Map.entry("path", "/api/users"),
+                Map.entry("normalizedPath", "/api/users")
             )),
             "relationships", List.of(
                 Map.of(
@@ -174,10 +174,10 @@ class CodeGraphAppEndToEndTest {
                     "language", "typescript"
                 ),
                 Map.of(
-                    "id", "rel-endpoint-function",
-                    "fromNodeId", "frontend-demo#src/pages/UserPage.tsx::endpoint:UI:CLICK:button:Save",
-                    "toNodeId", "frontend-demo#src/pages/UserPage.tsx::saveUser()",
-                    "relationshipType", "ENDPOINT_TO_FUNCTION",
+                    "id", "rel-function-endpoint",
+                    "fromNodeId", "frontend-demo#src/pages/UserPage.tsx::saveUser()",
+                    "toNodeId", "frontend-demo#src/pages/UserPage.tsx::endpoint:HTTP:POST:/api/users",
+                    "relationshipType", "FUNCTION_TO_ENDPOINT",
                     "language", "typescript"
                 )
             )
@@ -194,13 +194,13 @@ class CodeGraphAppEndToEndTest {
             .containsExactly("frontend-demo#src/pages/UserPage.tsx");
         assertThat(repository.findEndpointsByProjectFilePath("frontend-demo", "src/pages/UserPage.tsx"))
             .extracting(CodeEndpointDO::getEndpointType)
-            .containsExactly("UI");
+            .containsExactly("HTTP");
         assertThat(repository.findOutgoingRelationships(
                 "frontend-demo",
-                "frontend-demo::frontend-demo#src/pages/UserPage.tsx::endpoint:UI:CLICK:button:Save",
-                "ENDPOINT_TO_FUNCTION"))
+                "frontend-demo::frontend-demo#src/pages/UserPage.tsx::saveUser()",
+                "FUNCTION_TO_ENDPOINT"))
             .extracting(CodeRelationshipDO::getToNodeId)
-            .containsExactly("frontend-demo::frontend-demo#src/pages/UserPage.tsx::saveUser()");
+            .containsExactly("frontend-demo::frontend-demo#src/pages/UserPage.tsx::endpoint:HTTP:POST:/api/users");
     }
 
     private void assertGraph(Path sourceFile, String path, String matchIdentity, String functionName) {

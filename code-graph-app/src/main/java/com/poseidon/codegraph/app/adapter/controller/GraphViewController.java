@@ -297,7 +297,7 @@ public class GraphViewController {
             value.getQualifiedName(),
             value.getProjectFilePath(),
             value.getGitRepoUrl(),
-            firstText(value.getNormalizedPath(), value.getPath(), value.getRoutePath(), value.getTopic(), value.getTableName()),
+            firstText(value.getNormalizedPath(), value.getPath(), value.getTopic(), value.getTableName()),
             value.getHttpMethod(),
             null);
     }

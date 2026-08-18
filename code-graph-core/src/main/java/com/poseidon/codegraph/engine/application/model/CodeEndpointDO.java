@@ -21,7 +21,7 @@ public class CodeEndpointDO {
     private Integer endLine;
     
     // ===== 端点特有属性 =====
-    private String endpointType;      // HTTP, MQ, REDIS, DB, UI
+    private String endpointType;      // HTTP, MQ, REDIS, DB
     private String direction;         // inbound / outbound
     private Boolean isExternal;
     
@@ -46,14 +46,6 @@ public class CodeEndpointDO {
     private String tableName;
     private String dbOperation;
 
-    // UI 相关
-    private String uiEvent;
-    private String uiElement;
-    private String uiText;
-    private String uiSelector;
-    private String routePath;
-    private String componentName;
-    
     // 通用属性
     private String serviceName;
     private String parseLevel;

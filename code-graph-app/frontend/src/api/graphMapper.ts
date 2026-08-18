@@ -8,7 +8,7 @@ export const normalizeNodeType = (raw?: string) => {
   if (upper === 'PACKAGE' || upper === 'CODEPACKAGE') return 'CodePackage'
   if (upper === 'UNIT' || upper === 'CODEUNIT' || upper === 'CLASS' || upper === 'INTERFACE') return 'CodeUnit'
   if (upper === 'FUNCTION' || upper === 'CODEFUNCTION' || upper === 'METHOD') return 'CodeFunction'
-  if (upper === 'ENDPOINT' || upper === 'CODEENDPOINT' || upper === 'HTTP' || upper === 'MQ' || upper === 'REDIS' || upper === 'DB' || upper === 'UI') {
+  if (upper === 'ENDPOINT' || upper === 'CODEENDPOINT' || upper === 'HTTP' || upper === 'MQ' || upper === 'REDIS' || upper === 'DB') {
     return 'CodeEndpoint'
   }
   if (value.startsWith('Code')) return value

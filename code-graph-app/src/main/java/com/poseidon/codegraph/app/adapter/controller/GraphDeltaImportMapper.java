@@ -173,7 +173,6 @@ final class GraphDeltaImportMapper {
             case "MQ" -> "mq";
             case "REDIS" -> "redis";
             case "DB" -> "db";
-            case "UI" -> "ui";
             default -> "http";
         };
     }

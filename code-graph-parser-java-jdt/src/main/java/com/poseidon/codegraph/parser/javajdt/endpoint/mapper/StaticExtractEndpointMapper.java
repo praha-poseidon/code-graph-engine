@@ -7,7 +7,6 @@ import com.poseidon.codegraph.model.endpoint.DbEndpoint;
 import com.poseidon.codegraph.model.endpoint.HttpEndpoint;
 import com.poseidon.codegraph.model.endpoint.MqEndpoint;
 import com.poseidon.codegraph.model.endpoint.RedisEndpoint;
-import com.poseidon.codegraph.model.endpoint.UiEndpoint;
 import com.poseidon.codegraph.parser.javajdt.JdtGraphIds;
 import com.poseidon.codegraph.parser.javajdt.endpoint.EndpointPathSupport;
 import com.poseidon.javastatic.extract.jdt.StaticExtractResult;
@@ -110,7 +109,6 @@ public final class StaticExtractEndpointMapper {
                 case MQ -> new MqEndpoint();
                 case REDIS -> new RedisEndpoint();
                 case DB -> new DbEndpoint();
-                case UI -> new UiEndpoint();
                 case UNKNOWN -> null;
             };
         } catch (IllegalArgumentException ignored) {
