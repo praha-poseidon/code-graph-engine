@@ -68,6 +68,13 @@ CODEGRAPH_PARSER_PROCESS_LANGUAGES=php
 CODEGRAPH_PARSER_PHP_COMMAND="node /path/to/code-graph-parser-php/dist/cli.js --stdio"
 ```
 
+Python parser example:
+
+```bash
+CODEGRAPH_PARSER_PROCESS_LANGUAGES=python
+CODEGRAPH_PARSER_PYTHON_COMMAND="python3.12 /path/to/code-graph-parser-python/bin/code-graph-parser-python --stdio"
+```
+
 The language name must match `ParseRequest.language` and the engine language inference.
 
 语言名必须和 `ParseRequest.language` 以及 engine 推断出的语言一致。
