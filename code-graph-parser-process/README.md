@@ -39,6 +39,15 @@ For the frontend React parser:
 -Dcodegraph.parser.process.typescript.command="node '/path/to/code-graph-parser-js/dist/cli.js' --stdio"
 ```
 
+For the PHP parser:
+
+PHP 解析器可以这样接入：
+
+```bash
+-Dcodegraph.parser.process.languages=php
+-Dcodegraph.parser.process.php.command="node '/path/to/code-graph-parser-php/dist/cli.js' --stdio"
+```
+
 The same configuration can be supplied with environment variables:
 
 也可以通过环境变量配置：
@@ -48,6 +57,15 @@ CODEGRAPH_PARSER_PROCESS_LANGUAGES=go,python
 CODEGRAPH_PARSER_GO_COMMAND="/path/to/go-parser --stdio"
 CODEGRAPH_PARSER_PYTHON_COMMAND="python3 /path/to/python_parser.py"
 CODEGRAPH_PARSER_PROCESS_TIMEOUT_SECONDS=60
+```
+
+PHP environment-variable example:
+
+PHP 环境变量示例：
+
+```bash
+CODEGRAPH_PARSER_PROCESS_LANGUAGES=php
+CODEGRAPH_PARSER_PHP_COMMAND="node /path/to/code-graph-parser-php/dist/cli.js --stdio"
 ```
 
 The language name must match `ParseRequest.language` and the engine language inference.
@@ -155,6 +173,6 @@ Endpoint objects are polymorphic. Add `endpointKind` when returning endpoints:
 }
 ```
 
-Supported `endpointKind` values are `http`, `mq`, `redis`, `db`, and `ui`.
+Supported `endpointKind` values are `http`, `mq`, `redis`, and `db`.
 
-当前支持的 `endpointKind` 是 `http`、`mq`、`redis`、`db`、`ui`。
+当前支持的 `endpointKind` 是 `http`、`mq`、`redis`、`db`。

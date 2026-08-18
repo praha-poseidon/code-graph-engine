@@ -475,7 +475,7 @@ public class IncrementalUpdateService {
         return context;
     }
 
-    private String inferLanguage(String projectFilePath) {
+    static String inferLanguage(String projectFilePath) {
         if (projectFilePath == null) {
             return "java";
         }
@@ -488,6 +488,9 @@ public class IncrementalUpdateService {
         }
         if (path.endsWith(".py")) {
             return "python";
+        }
+        if (path.endsWith(".php")) {
+            return "php";
         }
         if (path.endsWith(".js") || path.endsWith(".jsx")) {
             return "javascript";
