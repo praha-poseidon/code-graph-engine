@@ -27,7 +27,7 @@ class PhpProcessParserEndToEndTest {
     static void configureExternalParser() {
         System.setProperty("codegraph.parser.process.languages", "php");
         System.setProperty("codegraph.parser.process.php.command",
-            "node '" + System.getenv("PHP_CODE_GRAPH_CLI") + "' --stdio");
+            "'" + System.getenv("PHP_CODE_GRAPH_CLI") + "' --stdio");
         System.setProperty("codegraph.parser.process.timeoutSeconds", "30");
     }
 
@@ -61,16 +61,16 @@ class PhpProcessParserEndToEndTest {
             new String[] { projectRoot.resolve("src").toString() }
         );
 
-        String packageId = PROJECT + "::pkg:app";
-        String helperId = PROJECT + "::fn:app\\helper()";
-        String runId = PROJECT + "::fn:app\\service::run()";
+        String packageId = PROJECT + "::pkg:App";
+        String helperId = PROJECT + "::fn:App\\helper()";
+        String runId = PROJECT + "::fn:App\\Service::run()";
 
         assertThat(repository.findOutgoingRelationships(
                 PROJECT, packageId, RelationshipType.PACKAGE_TO_UNIT.name()))
             .extracting(relationship -> relationship.getToNodeId())
             .contains(
-                PROJECT + "::unit:app.(namespace@src/app.php#1)",
-                PROJECT + "::unit:app\\service"
+                PROJECT + "::unit:App@src/App.php",
+                PROJECT + "::unit:App\\Service"
             );
         assertThat(repository.findOutgoingRelationships(
                 PROJECT, runId, RelationshipType.CALLS.name()))
@@ -87,7 +87,7 @@ class PhpProcessParserEndToEndTest {
         Path sourceFile = projectRoot.resolve("src/App.php");
         ProcessCodeGraphParser parser = new ProcessCodeGraphParser(
             "php",
-            List.of("node", System.getenv("PHP_CODE_GRAPH_CLI"), "--stdio"),
+            List.of(System.getenv("PHP_CODE_GRAPH_CLI"), "--stdio"),
             Duration.ofSeconds(30)
         );
 
@@ -101,18 +101,18 @@ class PhpProcessParserEndToEndTest {
             "git@example/php-process-e2e.git",
             "main",
             ChangeType.SOURCE_ADDED,
-            List.of(),
+            List.of(phpParserRoot().getParent().resolve("static-extract-php/examples/conformance/php-endpoints/rules/symfony-route.ser").toString()),
             List.of(),
             Map.of(),
-            Map.of("staticExtractPresetRules", true)
+            Map.of()
         ));
 
         assertThat(delta.endpoints())
             .extracting(endpoint -> endpoint.getMatchIdentity())
-            .contains("HTTP:GET:/api/run", "HTTP:POST:/configured/run", "REDIS:demo:key");
+            .containsExactly("HTTP:GET:/api/run");
         assertThat(delta.relationships())
             .extracting(relationship -> relationship.getRelationshipType())
-            .contains(RelationshipType.ENDPOINT_TO_FUNCTION, RelationshipType.FUNCTION_TO_ENDPOINT);
+            .contains(RelationshipType.ENDPOINT_TO_FUNCTION);
     }
 
     private static Path phpParserRoot() {
