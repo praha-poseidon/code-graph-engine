@@ -492,6 +492,9 @@ public class IncrementalUpdateService {
         if (path.endsWith(".php")) {
             return "php";
         }
+        if (path.endsWith(".kt") || path.endsWith(".kts")) {
+            return "kotlin";
+        }
         if (path.endsWith(".js") || path.endsWith(".jsx")) {
             return "javascript";
         }

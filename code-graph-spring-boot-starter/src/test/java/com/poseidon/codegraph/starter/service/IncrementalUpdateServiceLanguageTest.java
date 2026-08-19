@@ -18,5 +18,7 @@ class IncrementalUpdateServiceLanguageTest {
         assertEquals("go", IncrementalUpdateService.inferLanguage("cmd/main.go"));
         assertEquals("javascript", IncrementalUpdateService.inferLanguage("src/app.jsx"));
         assertEquals("typescript", IncrementalUpdateService.inferLanguage("src/app.tsx"));
+        assertEquals("kotlin", IncrementalUpdateService.inferLanguage("src/App.kt"));
+        assertEquals("kotlin", IncrementalUpdateService.inferLanguage("build.gradle.kts"));
     }
 }
