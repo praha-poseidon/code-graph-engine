@@ -86,6 +86,7 @@ class ProcessParserConfigTest {
         assertEquals(1, delta.units().size());
         assertEquals(1, delta.endpoints().size());
         assertEquals("HTTP:GET:/api/users/{param}", delta.endpoints().get(0).getMatchIdentity());
+        assertEquals("source=manual", delta.endpoints().get(0).getOther());
         assertEquals(com.poseidon.codegraph.model.RelationshipType.UNIT_TO_FUNCTION, delta.relationships().get(1).getRelationshipType());
     }
 
@@ -324,7 +325,8 @@ class FrontendExternalParser {
                   "matchIdentity": "HTTP:GET:/api/users/{param}",
                   "httpMethod": "GET",
                   "path": "/api/users/1",
-                  "normalizedPath": "/api/users/{param}"
+                  "normalizedPath": "/api/users/{param}",
+                  "other": "source=manual"
                 }
               ],
               "relationships": [

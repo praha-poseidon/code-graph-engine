@@ -51,4 +51,5 @@ public class CodeEndpointDO {
     private String parseLevel;
     private String targetService;
     private String matchIdentity;
+    private String other;
 }

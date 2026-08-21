@@ -12,7 +12,6 @@ import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -28,11 +27,11 @@ class EndpointPathOverrideSupportTest {
     @Test
     void methodKeyHasNoSiteTag() {
         assertEquals(
-                "metis.KaleidoGatewayImpl.a()",
-                EndpointIdentityOverride.methodKey("metis", "KaleidoGatewayImpl", "a", 0));
+                "com.example.KaleidoGatewayImpl.a()",
+                EndpointIdentityOverride.methodKey("com.example.KaleidoGatewayImpl", "a", 0));
         assertEquals(
-                "gemini.CooperAssetConsumer.run()",
-                EndpointIdentityOverride.methodKey("gemini", "CooperAssetConsumer", "run", 0));
+                "com.example.CooperAssetConsumer.run()",
+                EndpointIdentityOverride.methodKey("com.example.CooperAssetConsumer", "run", 0));
     }
 
     @Test
@@ -87,16 +86,12 @@ class EndpointPathOverrideSupportTest {
                   httpMethod: httpMethod
                   path: path
                 }
+                dict {
+                  com.example.KaleidoGatewayImpl.a() = v1/bac/sdfsdf
+                }
                 """;
 
-        EndpointParsingService service = new EndpointParsingService(List.of(webClientSer), List.of(), false);
-
-        // Method-level key only — no WebClient.uri / MQ site tags
-        String key = "metis.KaleidoGatewayImpl.a()";
-        Map<String, Map<String, List<String>>> external =
-                Map.of(
-                        EndpointIdentityOverride.NAMESPACE,
-                        Map.of(key, List.of("v1/bac/sdfsdf")));
+        EndpointParsingService service = new EndpointParsingService(List.of(webClientSer), List.of());
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
@@ -105,9 +100,7 @@ class EndpointPathOverrideSupportTest {
                         "com.example",
                         "KaleidoGatewayImpl.java",
                         "src/main/java/com/example/KaleidoGatewayImpl.java",
-                        null,
-                        external,
-                        "metis");
+                        null);
 
         assertEquals(1, endpoints.size(), "one outbound endpoint");
         HttpEndpoint ep = assertInstanceOf(HttpEndpoint.class, endpoints.get(0));
@@ -149,10 +142,10 @@ class EndpointPathOverrideSupportTest {
                 let path = from chain next uri argument[0] take value
                 build { httpMethod: httpMethod path: path }
                 """;
-        EndpointParsingService service = new EndpointParsingService(List.of(webClientSer), List.of(), false);
+        EndpointParsingService service = new EndpointParsingService(List.of(webClientSer), List.of());
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
-                        type, cu, "com.example", "Client.java", "Client.java", null, Map.of(), "demo");
+                        type, cu, "com.example", "Client.java", "Client.java", null);
         assertEquals(1, endpoints.size());
         HttpEndpoint ep = assertInstanceOf(HttpEndpoint.class, endpoints.get(0));
         assertTrue(
@@ -185,16 +178,15 @@ class EndpointPathOverrideSupportTest {
                 find call CarreraProducer.[send]
                 let topic = from argument[0] take value
                 build { topic: topic }
+                dict {
+                  com.example.Producer.sendEvent() = order.created
+                }
                 """;
-        EndpointParsingService service = new EndpointParsingService(List.of(mqSer), List.of(), false);
-        Map<String, Map<String, List<String>>> external =
-                Map.of(
-                        EndpointIdentityOverride.NAMESPACE,
-                        Map.of("demo.Producer.sendEvent()", List.of("order.created")));
+        EndpointParsingService service = new EndpointParsingService(List.of(mqSer), List.of());
 
         List<CodeEndpoint> endpoints =
                 service.parseEndpointsForType(
-                        type, cu, "com.example", "Producer.java", "Producer.java", null, external, "demo");
+                        type, cu, "com.example", "Producer.java", "Producer.java", null);
 
         assertEquals(1, endpoints.size());
         MqEndpoint mq = assertInstanceOf(MqEndpoint.class, endpoints.get(0));

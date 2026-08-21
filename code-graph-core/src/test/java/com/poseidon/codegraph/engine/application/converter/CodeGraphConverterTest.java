@@ -149,7 +149,10 @@ class CodeGraphConverterTest {
         CodeEndpointDO dobj = CodeGraphConverter.toDO(endpoint);
         assertEquals("HTTP", dobj.getEndpointType());
         assertEquals("POST", dobj.getHttpMethod());
-        assertEquals("/api/orders", assertInstanceOf(HttpEndpoint.class, CodeGraphConverter.toDomain(dobj)).getPath());
+        assertEquals("endpoint metadata", dobj.getOther());
+        HttpEndpoint roundTripped = assertInstanceOf(HttpEndpoint.class, CodeGraphConverter.toDomain(dobj));
+        assertEquals("/api/orders", roundTripped.getPath());
+        assertEquals("endpoint metadata", roundTripped.getOther());
     }
 
     private void assertMqRoundTrip() {
@@ -206,6 +209,7 @@ class CodeGraphConverterTest {
         dobj.setParseLevel("full");
         dobj.setTargetService("target");
         dobj.setMatchIdentity("match");
+        dobj.setOther("endpoint metadata");
         return dobj;
     }
 
@@ -226,5 +230,6 @@ class CodeGraphConverterTest {
         endpoint.setParseLevel("full");
         endpoint.setTargetService("target");
         endpoint.setMatchIdentity("match");
+        endpoint.setOther("endpoint metadata");
     }
 }

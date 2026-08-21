@@ -43,7 +43,7 @@ class StaticExtractEndpointMapperTest {
         MethodDeclaration method = (MethodDeclaration) type.getMethods()[0];
 
         CodeEndpoint endpoint = StaticExtractEndpointMapper.toCodeEndpoint(
-            result(rule("HTTP", "inbound"), Map.of("path", "/api/v1/users/{id}", "unknownField", "ignored"), method),
+            result(rule("HTTP", "inbound"), Map.of("path", "/api/v1/users/{id}", "other", "source=manual", "unknownField", "ignored"), method),
             cu,
             type,
             "src/App.java");
@@ -51,6 +51,7 @@ class StaticExtractEndpointMapperTest {
         HttpEndpoint http = assertInstanceOf(HttpEndpoint.class, endpoint);
         assertThat(http.getHttpMethod()).isEqualTo("UNKNOWN");
         assertThat(http.getPath()).isEqualTo("/api/v{version}/users/{param}");
+        assertThat(http.getOther()).isEqualTo("source=manual");
         assertThat(http.getMatchIdentity()).isEqualTo("UNKNOWN /api/v{version}/users/{param}");
         assertThat(http.getFunction().getId()).isEqualTo("fn:demo.App.run()");
         assertThat(http.getStartLine()).isEqualTo(1);

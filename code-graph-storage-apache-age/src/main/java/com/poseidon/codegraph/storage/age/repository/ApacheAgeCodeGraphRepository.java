@@ -366,7 +366,8 @@ public class ApacheAgeCodeGraphRepository implements
             Map.entry("httpMethod", value(endpoint.getHttpMethod())),
             Map.entry("path", value(endpoint.getPath())),
             Map.entry("normalizedPath", value(endpoint.getNormalizedPath())),
-            Map.entry("matchIdentity", value(endpoint.getMatchIdentity())));
+            Map.entry("matchIdentity", value(endpoint.getMatchIdentity())),
+            Map.entry("other", value(endpoint.getOther())));
     }
 
     private Map<String, ?> relationshipProps(CodeRelationshipDO relationship) {

@@ -2,6 +2,7 @@ package com.poseidon.codegraph.model.delta;
 
 import com.poseidon.codegraph.model.CodeEndpoint;
 import com.poseidon.codegraph.model.CodeFunction;
+import com.poseidon.codegraph.model.CodeNode;
 import com.poseidon.codegraph.model.CodePackage;
 import com.poseidon.codegraph.model.CodeRelationship;
 import com.poseidon.codegraph.model.CodeUnit;
@@ -11,6 +12,7 @@ import com.poseidon.codegraph.model.RelationshipType;
 import com.poseidon.codegraph.model.endpoint.HttpEndpoint;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -63,6 +65,24 @@ class GraphDeltaValidatorTest {
         GraphDelta delta = delta(List.of(unit), List.of(function), List.of(relationship));
 
         assertThrows(GraphDeltaValidationException.class, () -> validator.validateOrThrow(delta));
+    }
+
+    @Test
+    void validatesEveryDeclaredRelationshipTypeAgainstItsEndpointNodeKinds() {
+        for (RelationshipType type : RelationshipType.values()) {
+            CodeNode from = node(type.getFromLabel(), "from-" + type.name());
+            CodeNode to = node(type.getToLabel(), "to-" + type.name());
+            CodeRelationship relationship = relationship(from.getId(), to.getId(), type);
+            GraphDelta delta = deltaWithNodes(List.of(from, to), relationship);
+
+            assertDoesNotThrow(() -> validator.validateOrThrow(delta), type.name());
+
+            CodeNode wrongFrom = node(differentLabel(type.getFromLabel()), "wrong-from-" + type.name());
+            CodeRelationship invalid = relationship(wrongFrom.getId(), to.getId(), type);
+            List<String> codes = validator.validate(deltaWithNodes(List.of(wrongFrom, to), invalid))
+                .stream().map(Diagnostic::code).toList();
+            assertEquals(List.of("relationship.from.type.invalid"), codes, type.name());
+        }
     }
 
     @Test
@@ -184,5 +204,40 @@ class GraphDeltaValidatorTest {
         endpoint.setEndpointType(EndpointType.HTTP);
         endpoint.setDirection("inbound");
         return endpoint;
+    }
+
+    private CodeNode node(String label, String id) {
+        return switch (label) {
+            case "CodePackage" -> pkg("pkg:" + id);
+            case "CodeUnit" -> unit("unit:" + id);
+            case "CodeFunction" -> function("fn:" + id);
+            case "CodeEndpoint" -> endpoint("endpoint:inbound:HTTP:" + id);
+            default -> throw new IllegalArgumentException("unknown node label " + label);
+        };
+    }
+
+    private String differentLabel(String label) {
+        return switch (label) {
+            case "CodePackage" -> "CodeUnit";
+            case "CodeUnit" -> "CodeFunction";
+            case "CodeFunction" -> "CodeEndpoint";
+            case "CodeEndpoint" -> "CodePackage";
+            default -> throw new IllegalArgumentException("unknown node label " + label);
+        };
+    }
+
+    private GraphDelta deltaWithNodes(List<CodeNode> nodes, CodeRelationship relationship) {
+        List<CodePackage> packages = new ArrayList<>();
+        List<CodeUnit> units = new ArrayList<>();
+        List<CodeFunction> functions = new ArrayList<>();
+        List<CodeEndpoint> endpoints = new ArrayList<>();
+        for (CodeNode node : nodes) {
+            if (node instanceof CodePackage value) packages.add(value);
+            else if (node instanceof CodeUnit value) units.add(value);
+            else if (node instanceof CodeFunction value) functions.add(value);
+            else if (node instanceof CodeEndpoint value) endpoints.add(value);
+        }
+        return new GraphDelta(null, packages, units, functions, endpoints,
+            List.of(relationship), List.of(), List.of(), List.of());
     }
 }

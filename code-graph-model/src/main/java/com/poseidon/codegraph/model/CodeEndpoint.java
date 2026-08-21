@@ -61,6 +61,12 @@ public abstract class CodeEndpoint extends CodeNode {
     private String matchIdentity;
 
     /**
+     * 端点的扩展信息。该字段由 SER build 的同名字段原样透传，
+     * 不参与端点身份计算和跨服务匹配。
+     */
+    private String other;
+
+    /**
      * 计算端点的匹配标识（由子类实现）
      */
     public abstract String computeMatchIdentity();

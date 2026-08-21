@@ -159,6 +159,7 @@ public class CodeGraphConverter {
         domain.setParseLevel(dobj.getParseLevel());
         domain.setTargetService(dobj.getTargetService());
         domain.setMatchIdentity(dobj.getMatchIdentity());
+        domain.setOther(dobj.getOther());
         
         return domain;
     }
@@ -270,6 +271,7 @@ public class CodeGraphConverter {
         dobj.setParseLevel(domain.getParseLevel());
         dobj.setTargetService(domain.getTargetService());
         dobj.setMatchIdentity(domain.getMatchIdentity());
+        dobj.setOther(domain.getOther());
         
         // 根据子类类型设置特定字段
         if (domain instanceof HttpEndpoint) {

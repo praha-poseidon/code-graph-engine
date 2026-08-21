@@ -62,7 +62,8 @@ public class Neo4jCodeEndpointRepository implements CodeEndpointRepository {
                 e.serviceName = endpoint.serviceName,
                 e.parseLevel = endpoint.parseLevel,
                 e.targetService = endpoint.targetService,
-                e.matchIdentity = endpoint.matchIdentity
+                e.matchIdentity = endpoint.matchIdentity,
+                e.other = endpoint.other
             """;
         
         try (Session session = driver.session()) {
@@ -110,7 +111,8 @@ public class Neo4jCodeEndpointRepository implements CodeEndpointRepository {
                 e.serviceName = endpoint.serviceName,
                 e.parseLevel = endpoint.parseLevel,
                 e.targetService = endpoint.targetService,
-                e.matchIdentity = endpoint.matchIdentity
+                e.matchIdentity = endpoint.matchIdentity,
+                e.other = endpoint.other
             """;
         
         try (Session session = driver.session()) {
@@ -261,6 +263,7 @@ public class Neo4jCodeEndpointRepository implements CodeEndpointRepository {
             endpoint.setParseLevel(node.get("parseLevel").asString(null));
             endpoint.setTargetService(node.get("targetService").asString(null));
             endpoint.setMatchIdentity(node.get("matchIdentity").asString(null));
+            endpoint.setOther(node.get("other").asString(null));
             // functionId 不再持久化
             endpoints.add(endpoint);
         });
@@ -303,6 +306,7 @@ public class Neo4jCodeEndpointRepository implements CodeEndpointRepository {
         map.put("parseLevel", endpoint.getParseLevel());
         map.put("targetService", endpoint.getTargetService());
         map.put("matchIdentity", endpoint.getMatchIdentity());
+        map.put("other", endpoint.getOther());
         // functionId 不再持久化
         return map;
     }

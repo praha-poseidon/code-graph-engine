@@ -216,6 +216,10 @@ Example:
 
 The engine stores what the parser emits through the common model. It does not hard-code which endpoint kinds are valid.
 
+Every endpoint may also carry an optional opaque string field named `other`.
+Parsers pass the SER `build { other: ... }` value through unchanged; `other` is
+metadata only and is excluded from endpoint IDs and matching identities.
+
 ## Storage
 
 The app defaults to memory storage:
