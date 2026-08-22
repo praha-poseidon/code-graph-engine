@@ -5,6 +5,8 @@ import com.poseidon.codegraph.model.EndpointType;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.util.Locale;
+
 /**
  * HTTP 协议端点
  */
@@ -13,7 +15,7 @@ import lombok.EqualsAndHashCode;
 public class HttpEndpoint extends CodeEndpoint {
     private String httpMethod;        // GET, POST, PUT, DELETE 等
     private String path;               // /api/users/{id}
-    private String normalizedPath;     // 标准化后的路径（包含方法名）
+    private String normalizedPath;     // 兼容字段；parser 只复制 static-extract 的最终 path
 
     public HttpEndpoint() {
         setEndpointType(EndpointType.HTTP);
@@ -21,8 +23,10 @@ public class HttpEndpoint extends CodeEndpoint {
 
     @Override
     public String computeMatchIdentity() {
-        return (httpMethod != null ? httpMethod : "UNKNOWN") + " " + 
-               (normalizedPath != null ? normalizedPath : (path != null ? path : ""));
+        String method = httpMethod == null || httpMethod.isBlank()
+                ? "ANY"
+                : httpMethod.trim().toUpperCase(Locale.ROOT);
+        String identityPath = path != null ? path : (normalizedPath != null ? normalizedPath : "");
+        return "HTTP:" + method + ":" + identityPath;
     }
 }
-

@@ -138,7 +138,7 @@ class EndpointParsingServiceTest {
         assertEquals("inbound", endpoint.getDirection());
         assertEquals("GET", endpoint.getHttpMethod());
         assertEquals("/api/users/{param}", endpoint.getPath());
-        assertEquals("GET /api/users/{param}", endpoint.getMatchIdentity());
+        assertEquals("HTTP:GET:/api/users/{param}", endpoint.getMatchIdentity());
     }
 
     @Test
@@ -184,7 +184,7 @@ class EndpointParsingServiceTest {
         assertEquals("outbound", endpoint.getDirection());
         assertEquals("GET", endpoint.getHttpMethod());
         assertEquals("/api/users/{param}", endpoint.getPath());
-        assertEquals("GET /api/users/{param}", endpoint.getMatchIdentity());
+        assertEquals("HTTP:GET:/api/users/{param}", endpoint.getMatchIdentity());
     }
 
     @Test
@@ -221,7 +221,7 @@ class EndpointParsingServiceTest {
 
         assertEquals(1, endpoints.size());
         HttpEndpoint endpoint = assertInstanceOf(HttpEndpoint.class, endpoints.get(0));
-        assertEquals("GET /api/users/{param}", endpoint.getMatchIdentity());
+        assertEquals("HTTP:GET:/api/users/{param}", endpoint.getMatchIdentity());
     }
 
     @Test
@@ -265,12 +265,12 @@ class EndpointParsingServiceTest {
         assertEquals(1, endpoints.size());
         HttpEndpoint endpoint = assertInstanceOf(HttpEndpoint.class, endpoints.get(0));
         assertEquals("GET", endpoint.getHttpMethod());
-        assertEquals("/api/v{version}/users/{param}", endpoint.getPath());
-        assertEquals("GET /api/v{version}/users/{param}", endpoint.getMatchIdentity());
+        assertEquals("/api/v1/users/{param}", endpoint.getPath());
+        assertEquals("HTTP:GET:/api/v1/users/{param}", endpoint.getMatchIdentity());
     }
 
     @Test
-    void parsesClassAndMethodPathAttributesAndStripsQueryParameters() {
+    void parsesClassAndMethodPathAttributesWithoutParserSidePathRewrites() {
         CompilationUnit cu =
                 parse(
                         """
@@ -304,8 +304,8 @@ class EndpointParsingServiceTest {
         assertEquals(1, endpoints.size());
         HttpEndpoint endpoint = assertInstanceOf(HttpEndpoint.class, endpoints.get(0));
         assertEquals("POST", endpoint.getHttpMethod());
-        assertEquals("/api/orders/{param}", endpoint.getPath());
-        assertEquals("POST /api/orders/{param}", endpoint.getMatchIdentity());
+        assertEquals("/api/orders/{param}?debug=true", endpoint.getPath());
+        assertEquals("HTTP:POST:/api/orders/{param}?debug=true", endpoint.getMatchIdentity());
     }
 
     @Test
@@ -327,7 +327,7 @@ class EndpointParsingServiceTest {
     }
 
     @Test
-    void stripsQueryAndNormalizesApiVersionFromOutboundPath() {
+    void serExtractPathStripsQueryButKeepsLiteralApiVersion() {
         CompilationUnit cu =
                 parse(
                         """
@@ -361,8 +361,8 @@ class EndpointParsingServiceTest {
 
         assertEquals(1, endpoints.size());
         HttpEndpoint endpoint = assertInstanceOf(HttpEndpoint.class, endpoints.get(0));
-        assertEquals("/api/v{version}/users", endpoint.getPath());
-        assertEquals("GET /api/v{version}/users", endpoint.getMatchIdentity());
+        assertEquals("/api/v1/users", endpoint.getPath());
+        assertEquals("HTTP:GET:/api/v1/users", endpoint.getMatchIdentity());
     }
 
     @SuppressWarnings("deprecation")

@@ -198,7 +198,7 @@ class GraphDeltaApplyServiceTest {
 
         context.getReader().setFindExistingEndpointsByIds(ids -> java.util.Set.of());
         context.getReader().setFindEndpointsByMatchIdentity((matchIdentity, direction) -> {
-            if ("GET /users".equals(matchIdentity) && "outbound".equals(direction)) {
+            if ("HTTP:GET:/users".equals(matchIdentity) && "outbound".equals(direction)) {
                 return List.of(existingOutbound);
             }
             return List.of();
@@ -428,13 +428,13 @@ class GraphDeltaApplyServiceTest {
     private HttpEndpoint endpoint(String id, String direction, String method, String path) {
         HttpEndpoint endpoint = new HttpEndpoint();
         endpoint.setId(id);
-        endpoint.setName(method + " " + path);
+        endpoint.setName("HTTP:" + method + ":" + path);
         endpoint.setLanguage("java");
         endpoint.setProjectFilePath("src/main/java/demo/User.java");
         endpoint.setDirection(direction);
         endpoint.setHttpMethod(method);
         endpoint.setPath(path);
-        endpoint.setMatchIdentity(method + " " + path);
+        endpoint.setMatchIdentity("HTTP:" + method + ":" + path);
         return endpoint;
     }
 }

@@ -60,7 +60,7 @@ class CodeGraphAppEndToEndTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200));
 
-        assertGraph(sourceFile, "/api/v{version}/users/{param}", "GET /api/v{version}/users/{param}", "getUser");
+        assertGraph(sourceFile, "/api/v1/users/{param}?debug=true", "HTTP:GET:/api/v1/users/{param}?debug=true", "getUser");
 
         Files.writeString(sourceFile, source("/api/v2/orders/{orderId}", "getOrder"));
 
@@ -70,8 +70,8 @@ class CodeGraphAppEndToEndTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200));
 
-        assertGraph(sourceFile, "/api/v{version}/orders/{param}", "GET /api/v{version}/orders/{param}", "getOrder");
-        assertThat(repository.findEndpointsByMatchIdentity("GET /api/v{version}/users/{param}", "inbound"))
+        assertGraph(sourceFile, "/api/v2/orders/{param}", "HTTP:GET:/api/v2/orders/{param}", "getOrder");
+        assertThat(repository.findEndpointsByMatchIdentity("HTTP:GET:/api/v1/users/{param}?debug=true", "inbound"))
             .filteredOn(endpoint -> PROJECT.equals(endpoint.getProjectName()))
             .isEmpty();
         assertThat(repository.findExistingFunctionsByQualifiedNames(
@@ -263,13 +263,14 @@ class CodeGraphAppEndToEndTest {
             rule "Custom HTTP Inbound"
             endpoint HTTP inbound
 
-            find method with annotation @RouteGet
+            find method
+            when annotation @RouteGet on method
 
             let httpMethod =
               from literal GET take value
 
             let path =
-              from annotation on method @RouteGet take attr(value)
+              from annotation @RouteGet on method take attr(value)
 
             build {
               httpMethod: httpMethod

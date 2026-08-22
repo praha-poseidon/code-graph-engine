@@ -49,10 +49,11 @@ class StaticExtractEndpointMapperTest {
             "src/App.java");
 
         HttpEndpoint http = assertInstanceOf(HttpEndpoint.class, endpoint);
-        assertThat(http.getHttpMethod()).isEqualTo("UNKNOWN");
-        assertThat(http.getPath()).isEqualTo("/api/v{version}/users/{param}");
+        assertThat(http.getHttpMethod()).isEqualTo("ANY");
+        assertThat(http.getPath()).isEqualTo("/api/v1/users/{id}");
+        assertThat(http.getNormalizedPath()).isEqualTo("/api/v1/users/{id}");
         assertThat(http.getOther()).isEqualTo("source=manual");
-        assertThat(http.getMatchIdentity()).isEqualTo("UNKNOWN /api/v{version}/users/{param}");
+        assertThat(http.getMatchIdentity()).isEqualTo("HTTP:ANY:/api/v1/users/{id}");
         assertThat(http.getFunction().getId()).isEqualTo("fn:demo.App.run()");
         assertThat(http.getStartLine()).isEqualTo(1);
         assertThat(http.getProjectFilePath()).isEqualTo("src/App.java");
@@ -88,12 +89,12 @@ class StaticExtractEndpointMapperTest {
         assertThat(mq.getIsExternal()).isTrue();
 
         RedisEndpoint redis = assertInstanceOf(RedisEndpoint.class, StaticExtractEndpointMapper.toCodeEndpoint(
-            result(rule("REDIS", "outbound"), Map.of("keyPattern", "user:*", "command", "GET", "dataStructure", "STRING"), null),
+            result(rule("REDIS", "outbound"), Map.of("keyPattern", "user:*", "command", "DEL", "dataStructure", "STRING"), null),
             cu,
             type,
             "src/App.java"));
         assertThat(redis.getKeyPattern()).isEqualTo("user:*");
-        assertThat(redis.getCommand()).isEqualTo("GET");
+        assertThat(redis.getCommand()).isEqualTo("DELETE");
         assertThat(redis.getDataStructure()).isEqualTo("STRING");
         assertThat(redis.getMatchIdentity()).isEqualTo("REDIS:user:*");
 

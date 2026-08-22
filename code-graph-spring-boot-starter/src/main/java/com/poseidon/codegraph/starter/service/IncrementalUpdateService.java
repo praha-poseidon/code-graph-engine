@@ -10,6 +10,7 @@ import com.poseidon.codegraph.model.delta.DeltaScope;
 import com.poseidon.codegraph.model.delta.GraphDelta;
 import com.poseidon.codegraph.model.event.NodeChangeListener;
 import com.poseidon.codegraph.spi.CodeGraphParserRegistry;
+import com.poseidon.codegraph.spi.CodeGraphParserSession;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -49,6 +50,17 @@ public class IncrementalUpdateService {
             CodeFunctionRepository functionRepository,
             CodeRelationshipRepository relationshipRepository,
             CodeEndpointRepository endpointRepository) {
+        this(packageRepository, unitRepository, functionRepository, relationshipRepository,
+            endpointRepository, CodeGraphParserRegistry.loadFromServiceLoader());
+    }
+
+    IncrementalUpdateService(
+            CodePackageRepository packageRepository,
+            CodeUnitRepository unitRepository,
+            CodeFunctionRepository functionRepository,
+            CodeRelationshipRepository relationshipRepository,
+            CodeEndpointRepository endpointRepository,
+            CodeGraphParserRegistry parserRegistry) {
         this.codeGraphService = new CodeGraphService();
         this.graphDeltaApplyService = new GraphDeltaApplyService();
         this.packageRepository = packageRepository;
@@ -56,9 +68,26 @@ public class IncrementalUpdateService {
         this.functionRepository = functionRepository;
         this.relationshipRepository = relationshipRepository;
         this.endpointRepository = endpointRepository;
-        this.parserRegistry = CodeGraphParserRegistry.loadFromServiceLoader();
+        this.parserRegistry = parserRegistry;
         
         log.info("IncrementalUpdateService 初始化完成，已加载解析器: {}", parserRegistry.languages());
+    }
+
+    /**
+     * Opens a task-local parser session. The returned object owns all temporary
+     * parser processes and must be closed before the cloned project is deleted.
+     */
+    public IncrementalUpdateSession openSession(String language) {
+        CodeGraphParserSession parserSession = parserRegistry.openSession(language);
+        IncrementalUpdateService taskService = new IncrementalUpdateService(
+            packageRepository,
+            unitRepository,
+            functionRepository,
+            relationshipRepository,
+            endpointRepository,
+            parserRegistry.withParser(parserSession));
+        taskService.setNodeChangeListener(nodeChangeListener);
+        return new IncrementalUpdateSession(language, taskService, parserSession);
     }
 
     /**

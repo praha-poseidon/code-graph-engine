@@ -1,6 +1,7 @@
 package com.poseidon.codegraph.parser.process;
 
 import com.poseidon.codegraph.model.delta.ParseRequest;
+import com.poseidon.codegraph.spi.CodeGraphParserSession;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -56,6 +57,46 @@ class ProcessParserConfigTest {
 
         assertEquals(1, delta.functions().size());
         assertEquals("demo.main", delta.functions().get(0).getId());
+    }
+
+    @Test
+    void streamingSessionReusesOneProcessForMultipleFiles() {
+        String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        ProcessCodeGraphParser parser = new ProcessCodeGraphParser(
+            "go",
+            List.of(javaBin, "-cp", System.getProperty("java.class.path"), StreamingExternalParser.class.getName()),
+            Duration.ofSeconds(10),
+            true
+        );
+
+        try (CodeGraphParserSession session = parser.openSession()) {
+            var first = session.parse(request());
+            var second = session.parse(new ParseRequest(
+                "demo", "go", "/repo", List.of("/repo/second.go"), List.of("/repo"), List.of(),
+                null, null, null, List.of(), List.of(), Map.of(), Map.of("projectFilePath", "second.go")));
+
+            assertEquals("demo.call1", first.functions().get(0).getId());
+            assertEquals("demo.call2", second.functions().get(0).getId());
+        }
+    }
+
+    @Test
+    void streamingSessionRejectsSwitchingProjects() {
+        String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        ProcessCodeGraphParser parser = new ProcessCodeGraphParser(
+            "go",
+            List.of(javaBin, "-cp", System.getProperty("java.class.path"), StreamingExternalParser.class.getName()),
+            Duration.ofSeconds(10),
+            true
+        );
+
+        try (CodeGraphParserSession session = parser.openSession()) {
+            session.parse(request());
+            ParseRequest otherProject = new ParseRequest(
+                "other", "go", "/other", List.of("/other/main.go"), List.of("/other"), List.of(),
+                null, null, null, List.of(), List.of(), Map.of(), Map.of("projectFilePath", "main.go"));
+            assertThrows(IllegalArgumentException.class, () -> session.parse(otherProject));
+        }
     }
 
     @Test
@@ -240,6 +281,27 @@ class FakeExternalParser {
               "diagnostics": []
             }
             """);
+    }
+}
+
+class StreamingExternalParser {
+
+    public static void main(String[] args) throws Exception {
+        java.io.BufferedReader input = new java.io.BufferedReader(
+            new java.io.InputStreamReader(System.in, java.nio.charset.StandardCharsets.UTF_8));
+        String line;
+        int requestNumber = 0;
+        while ((line = input.readLine()) != null) {
+            requestNumber++;
+            System.out.println(("{\"scope\":null,\"packages\":[],\"units\":[],\"functions\":["
+                + "{\"id\":\"demo.call%d\",\"name\":\"call%d\",\"qualifiedName\":\"demo.call%d\","
+                + "\"language\":\"go\",\"projectName\":\"demo\",\"projectFilePath\":\"main.go\","
+                + "\"signature\":\"call%d()\",\"returnType\":\"void\"}],\"endpoints\":[],"
+                + "\"relationships\":[],\"deletedNodeIds\":[],\"deletedRelationshipIds\":[],"
+                + "\"diagnostics\":[]}").formatted(
+                    requestNumber, requestNumber, requestNumber, requestNumber));
+            System.out.flush();
+        }
     }
 }
 

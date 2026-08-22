@@ -117,7 +117,7 @@ class CodeGraphConverterTest {
         CodeEndpoint http = CodeGraphConverter.toDomain(httpDO);
         HttpEndpoint typedHttp = assertInstanceOf(HttpEndpoint.class, http);
         assertEquals("GET", typedHttp.getHttpMethod());
-        assertEquals("GET /api/users", typedHttp.computeMatchIdentity());
+        assertEquals("HTTP:GET:/api/users", typedHttp.computeMatchIdentity());
 
         CodeEndpointDO unknownDO = baseEndpointDO("NOT_A_TYPE");
         CodeEndpoint unknown = CodeGraphConverter.toDomain(unknownDO);

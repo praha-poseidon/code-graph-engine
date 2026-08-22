@@ -15,6 +15,14 @@ The external parser protocol is intentionally small:
 - stderr is treated as diagnostic text when the process exits with a non-zero code.
 - 当进程非 0 退出时，标准错误会作为诊断信息返回。
 
+Parsers may additionally support task-scoped streaming mode. In that mode each
+input line is one compact `ParseRequest`, each output line is the corresponding
+compact `GraphDelta`, and EOF closes the task. The engine still processes files
+sequentially, but does not restart the parser process between files.
+
+解析器还可以选择支持任务级流式模式：每一行输入是一个 `ParseRequest`，每一行输出是对应的
+`GraphDelta`，EOF 表示任务结束。文件仍然逐个处理，但任务内不再重复启动解析器进程。
+
 ## Configuration
 
 ## 配置
@@ -25,7 +33,8 @@ Enable one or more process parsers with JVM properties:
 
 ```bash
 -Dcodegraph.parser.process.languages=go,python
--Dcodegraph.parser.process.go.command="/path/to/go-parser --stdio"
+-Dcodegraph.parser.process.go.command="/path/to/go-parser --stdio-stream"
+-Dcodegraph.parser.process.go.streaming=true
 -Dcodegraph.parser.process.python.command="python3 /path/to/python_parser.py"
 -Dcodegraph.parser.process.timeoutSeconds=60
 ```
@@ -54,7 +63,8 @@ The same configuration can be supplied with environment variables:
 
 ```bash
 CODEGRAPH_PARSER_PROCESS_LANGUAGES=go,python
-CODEGRAPH_PARSER_GO_COMMAND="/path/to/go-parser --stdio"
+CODEGRAPH_PARSER_GO_COMMAND="/path/to/go-parser --stdio-stream"
+CODEGRAPH_PARSER_GO_STREAMING=true
 CODEGRAPH_PARSER_PYTHON_COMMAND="python3 /path/to/python_parser.py"
 CODEGRAPH_PARSER_PROCESS_TIMEOUT_SECONDS=60
 ```
@@ -169,14 +179,14 @@ Endpoint objects are polymorphic. Add `endpointKind` when returning endpoints:
 {
   "endpointKind": "http",
   "id": "demo:GET:/users/{id}",
-  "name": "GET /users/{id}",
+  "name": "HTTP:GET:/users/{id}",
   "language": "go",
   "projectFilePath": "main.go",
   "endpointType": "HTTP",
   "direction": "inbound",
   "httpMethod": "GET",
   "path": "/users/{id}",
-  "matchIdentity": "GET /users/{id}"
+  "matchIdentity": "HTTP:GET:/users/{id}"
 }
 ```
 

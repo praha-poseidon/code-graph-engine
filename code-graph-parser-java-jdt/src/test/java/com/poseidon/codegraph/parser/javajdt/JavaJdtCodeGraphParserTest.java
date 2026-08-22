@@ -138,7 +138,7 @@ class JavaJdtCodeGraphParserTest {
                 assertThat(endpoint.getDirection()).isEqualTo("inbound");
                 assertThat(endpoint.getHttpMethod()).isEqualTo("GET");
                 assertThat(endpoint.getPath()).isEqualTo("/api/users/{param}");
-                assertThat(endpoint.getMatchIdentity()).isEqualTo("GET /api/users/{param}");
+                assertThat(endpoint.getMatchIdentity()).isEqualTo("HTTP:GET:/api/users/{param}");
             });
     }
 
@@ -197,8 +197,8 @@ class JavaJdtCodeGraphParserTest {
             .isInstanceOfSatisfying(HttpEndpoint.class, endpoint -> {
                 assertThat(endpoint.getDirection()).isEqualTo("outbound");
                 assertThat(endpoint.getHttpMethod()).isEqualTo("GET");
-                assertThat(endpoint.getPath()).isEqualTo("/api/v{version}/users/{param}");
-                assertThat(endpoint.getMatchIdentity()).isEqualTo("GET /api/v{version}/users/{param}");
+                assertThat(endpoint.getPath()).isEqualTo("/api/v1/users/{param}");
+                assertThat(endpoint.getMatchIdentity()).isEqualTo("HTTP:GET:/api/v1/users/{param}");
             });
     }
 

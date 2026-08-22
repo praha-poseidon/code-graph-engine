@@ -49,7 +49,7 @@ class CodeGraphDebugControllerTest {
             .containsExactly("UNIT_TO_FUNCTION");
         assertThat(controller.endpoints("demo").getData())
             .extracting(CodeEndpointDO::getMatchIdentity)
-            .containsExactly("GET /api/users");
+            .containsExactly("HTTP:GET:/api/users");
     }
 
     private void seed(String projectName) {
@@ -81,14 +81,14 @@ class CodeGraphDebugControllerTest {
 
         CodeEndpointDO endpoint = new CodeEndpointDO();
         endpoint.setId(projectName + "::endpoint:users");
-        endpoint.setName("GET /api/users");
-        endpoint.setQualifiedName("GET /api/users");
+        endpoint.setName("HTTP:GET:/api/users");
+        endpoint.setQualifiedName("HTTP:GET:/api/users");
         endpoint.setProjectName(projectName);
         endpoint.setLanguage("typescript");
         endpoint.setProjectFilePath("src/api/user.ts");
         endpoint.setEndpointType("HTTP");
         endpoint.setDirection("outbound");
-        endpoint.setMatchIdentity("GET /api/users");
+        endpoint.setMatchIdentity("HTTP:GET:/api/users");
         repository.insertEndpointsBatch(List.of(endpoint));
 
         CodeRelationshipDO relationship = new CodeRelationshipDO();

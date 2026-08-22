@@ -42,6 +42,21 @@ public final class CodeGraphParserRegistry {
         return Optional.ofNullable(parsers.get(normalize(language)));
     }
 
+    public CodeGraphParserSession openSession(String language) {
+        return find(language)
+                .orElseThrow(() -> new IllegalStateException(
+                        "No code graph parser registered for language: " + language))
+                .openSession();
+    }
+
+    /** Returns a task-local registry with the selected parser replaced. */
+    public CodeGraphParserRegistry withParser(CodeGraphParser parser) {
+        List<CodeGraphParser> values = new ArrayList<>(parsers.values());
+        values.removeIf(existing -> normalize(existing.language()).equals(normalize(parser.language())));
+        values.add(parser);
+        return new CodeGraphParserRegistry(values);
+    }
+
     public List<String> languages() {
         return List.copyOf(parsers.keySet());
     }

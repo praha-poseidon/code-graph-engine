@@ -56,7 +56,7 @@ public abstract class CodeEndpoint extends CodeNode {
 
     /**
      * 匹配标识（用于跨服务关联 MATCHES 关系）
-     * 例如：HTTP: "GET /api/users/{param}"，MQ: "MQ:topic_name"
+     * 例如：HTTP: "HTTP:GET:/api/users/{param}"，MQ: "MQ:topic_name"
      */
     private String matchIdentity;
 

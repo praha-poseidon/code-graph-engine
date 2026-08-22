@@ -21,7 +21,7 @@ final class ProcessParserConfig {
         List<ProcessCodeGraphParser> parsers = new ArrayList<>();
         for (String language : languages()) {
             command(language).ifPresent(command ->
-                parsers.add(new ProcessCodeGraphParser(language, command, timeout())));
+                parsers.add(new ProcessCodeGraphParser(language, command, timeout(), streaming(language, command))));
         }
         return parsers;
     }
@@ -47,6 +47,15 @@ final class ProcessParserConfig {
         } catch (NumberFormatException ignored) {
             return Duration.ofSeconds(60);
         }
+    }
+
+    private static boolean streaming(String language, List<String> command) {
+        String normalized = normalize(language);
+        String propertyKey = "codegraph.parser.process." + normalized + ".streaming";
+        String envKey = "CODEGRAPH_PARSER_" + normalized.toUpperCase(Locale.ROOT).replace('-', '_') + "_STREAMING";
+        return value(propertyKey, envKey)
+            .map(Boolean::parseBoolean)
+            .orElseGet(() -> command.stream().anyMatch("--stdio-stream"::equals));
     }
 
     private static Optional<String> value(String propertyKey, String envKey) {

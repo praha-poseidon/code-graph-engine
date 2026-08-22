@@ -87,7 +87,7 @@ class EndpointPathOverrideSupportTest {
                   path: path
                 }
                 dict {
-                  com.example.KaleidoGatewayImpl.a() = v1/bac/sdfsdf
+                  com.example.KaleidoGatewayImpl.a() = /v1/bac/sdfsdf
                 }
                 """;
 

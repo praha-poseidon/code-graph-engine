@@ -8,7 +8,6 @@ import com.poseidon.codegraph.model.endpoint.HttpEndpoint;
 import com.poseidon.codegraph.model.endpoint.MqEndpoint;
 import com.poseidon.codegraph.model.endpoint.RedisEndpoint;
 import com.poseidon.codegraph.parser.javajdt.JdtGraphIds;
-import com.poseidon.codegraph.parser.javajdt.endpoint.EndpointPathSupport;
 import com.poseidon.javastatic.extract.jdt.StaticExtractResult;
 import com.poseidon.javastatic.extract.rule.EndpointSpec;
 import com.poseidon.javastatic.extract.rule.StaticExtractRule;
@@ -84,7 +83,7 @@ public final class StaticExtractEndpointMapper {
             applyField(endpoint, entry.getKey(), entry.getValue());
         }
 
-        completeDerivedFields(endpoint, anchor);
+        completeDerivedFields(endpoint);
 
         endpoint.setMatchIdentity(endpoint.computeMatchIdentity());
         endpoint.setName(endpoint.getMatchIdentity());
@@ -142,25 +141,24 @@ public final class StaticExtractEndpointMapper {
         log.debug("端点字段没有匹配的 setter，已忽略: {}.{}", endpoint.getClass().getSimpleName(), field);
     }
 
-    private static void completeDerivedFields(CodeEndpoint endpoint, ASTNode anchor) {
+    private static void completeDerivedFields(CodeEndpoint endpoint) {
         if (endpoint instanceof HttpEndpoint http) {
             if (http.getHttpMethod() == null || http.getHttpMethod().isBlank()) {
-                http.setHttpMethod("UNKNOWN");
+                http.setHttpMethod("ANY");
+            } else {
+                http.setHttpMethod(http.getHttpMethod().trim().toUpperCase(Locale.ROOT));
             }
             if (http.getPath() == null || http.getPath().isBlank()) {
                 return;
             }
-            // Identity from external dict (static-extract parseLevel=config) is already final —
-            // do not rewrite version segments etc.
-            if ("config".equals(endpoint.getParseLevel())) {
-                http.setNormalizedPath(http.getPath());
-                return;
-            }
-            String normalizedPath =
-                    EndpointPathSupport.normalizePathForEndpoint(
-                            anchor, http.getPath(), http.getDirection());
-            http.setPath(normalizedPath);
-            http.setNormalizedPath(normalizedPath);
+            // static-extract/SER owns endpoint identity. The graph mapper is a
+            // transport boundary and must not rewrite versions or placeholders.
+            http.setNormalizedPath(http.getPath());
+        }
+        if (endpoint instanceof RedisEndpoint redis
+                && redis.getCommand() != null && !redis.getCommand().isBlank()) {
+            String command = redis.getCommand().trim().toUpperCase(Locale.ROOT);
+            redis.setCommand("DEL".equals(command) ? "DELETE" : command);
         }
     }
 

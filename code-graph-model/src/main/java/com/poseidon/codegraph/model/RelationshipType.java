@@ -57,7 +57,7 @@ public enum RelationshipType {
     
     /**
      * 端点匹配关系（跨服务）
-     * - 连接 normalizedPath 相同的 outbound 和 inbound endpoint
+     * - 连接 matchIdentity 字符串完全相同的 outbound 和 inbound endpoint
      * - 方向：outbound -> inbound（从调用方指向提供方）
      * - 用于级联感知：删除/修改一端时可以找到所有匹配的另一端
      * - 注意：不创建 placeholder 端点，只在两端都存在时才创建关系

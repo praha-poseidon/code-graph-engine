@@ -89,9 +89,9 @@ class InMemoryCodeGraphRepositoryTest {
             relationship("call", "demo", "from", "to", "CALLS"),
             relationship("match", "demo", "from", "endpoint", "MATCHES")));
 
-        assertThat(repository.findEndpointsByMatchIdentity("GET /users", null)).extracting(CodeEndpointDO::getId)
+        assertThat(repository.findEndpointsByMatchIdentity("HTTP:GET:/users", null)).extracting(CodeEndpointDO::getId)
             .containsExactlyInAnyOrder("in", "out");
-        assertThat(repository.findEndpointsByMatchIdentity("GET /users", "outbound")).extracting(CodeEndpointDO::getId)
+        assertThat(repository.findEndpointsByMatchIdentity("HTTP:GET:/users", "outbound")).extracting(CodeEndpointDO::getId)
             .containsExactly("out");
         assertThat(repository.findOutgoingRelationships("demo", "from", "CALLS")).extracting(CodeRelationshipDO::getId)
             .containsExactly("call");
@@ -220,7 +220,7 @@ class InMemoryCodeGraphRepositoryTest {
         endpoint.setProjectName(projectName);
         endpoint.setProjectFilePath(projectFilePath);
         endpoint.setDirection(direction);
-        endpoint.setMatchIdentity("GET /users");
+        endpoint.setMatchIdentity("HTTP:GET:/users");
         return endpoint;
     }
 
