@@ -4,6 +4,14 @@ import com.poseidon.codegraph.engine.application.model.CodeEndpointDO;
 import com.poseidon.codegraph.model.RelationshipType;
 import com.poseidon.codegraph.starter.service.IncrementalUpdateService;
 import com.poseidon.codegraph.storage.memory.repository.InMemoryCodeGraphRepository;
+import com.poseidon.codegraph.storage.neo4j.repository.Neo4jCodeEndpointRepository;
+import com.poseidon.codegraph.storage.neo4j.repository.Neo4jCodeFunctionRepository;
+import com.poseidon.codegraph.storage.neo4j.repository.Neo4jCodePackageRepository;
+import com.poseidon.codegraph.storage.neo4j.repository.Neo4jCodeRelationshipRepository;
+import com.poseidon.codegraph.storage.neo4j.repository.Neo4jCodeUnitRepository;
+import org.neo4j.driver.AuthTokens;
+import org.neo4j.driver.Driver;
+import org.neo4j.driver.GraphDatabase;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -19,6 +27,7 @@ class FrontendProcessParserEndToEndTest {
 
     private static final String PROJECT = "frontend-process-e2e";
     private static final String TYPE_PROJECT = "frontend-type-relations-e2e";
+    private static final String REDUX_PROJECT = "frontend-redux-dispatch-e2e";
     private static final String FETCH_RULE = """
         rule "Frontend E2E Fetch"
         fact frontend_api_call
@@ -157,6 +166,60 @@ class FrontendProcessParserEndToEndTest {
             .containsExactly(save);
     }
 
+    /**
+     * Source oracle: model.ts declares user.effects.save/cancel; page.tsx maps them through
+     * connect/mapDispatch and calls the injected props through conditional expressions.
+     * Evidence is read back from Neo4j after the real parser process and Engine apply path.
+     */
+    @Test
+    @EnabledIfEnvironmentVariable(named = "NEO4J_URI", matches = ".+")
+    void reduxDispatchCallsMatchPersistedNeo4jEdges() {
+        String uri = System.getenv("NEO4J_URI");
+        String username = environmentOrDefault("NEO4J_USERNAME", "neo4j");
+        String password = environmentOrDefault("NEO4J_PASSWORD", "password");
+
+        try (Driver driver = GraphDatabase.driver(uri, AuthTokens.basic(username, password))) {
+            driver.verifyConnectivity();
+            deleteProject(driver, REDUX_PROJECT);
+
+            Neo4jCodePackageRepository packages = new Neo4jCodePackageRepository(driver);
+            Neo4jCodeUnitRepository units = new Neo4jCodeUnitRepository(driver);
+            Neo4jCodeFunctionRepository functions = new Neo4jCodeFunctionRepository(driver);
+            Neo4jCodeRelationshipRepository relationships = new Neo4jCodeRelationshipRepository(driver);
+            Neo4jCodeEndpointRepository endpoints = new Neo4jCodeEndpointRepository(driver);
+            IncrementalUpdateService service = new IncrementalUpdateService(
+                packages, units, functions, relationships, endpoints
+            );
+
+            Path projectRoot = frontendParserRoot().resolve("fixtures/redux-dispatch");
+            add(service, REDUX_PROJECT, projectRoot, "src/model.ts");
+            add(service, REDUX_PROJECT, projectRoot, "src/page.tsx");
+
+            String page = REDUX_PROJECT + "::src/page.tsx::Page({ save, cancel: onCancel }: Props)";
+            String propsPage = REDUX_PROJECT + "::src/page.tsx::PropsPage(props: Props)";
+            String dynamic = REDUX_PROJECT + "::src/page.tsx::dynamic(dispatch: any,model: string,effect: string)";
+            String save = REDUX_PROJECT + "::src/model.ts::user.effects.save(payload: unknown)";
+            String cancel = REDUX_PROJECT + "::src/model.ts::user.effects.cancel()";
+
+            assertThat(relationships.findOutgoingRelationships(
+                    REDUX_PROJECT, page, RelationshipType.CALLS.name()))
+                .extracting(relationship -> relationship.getToNodeId())
+                .containsExactlyInAnyOrder(save, cancel);
+            assertThat(relationships.findOutgoingRelationships(
+                    REDUX_PROJECT, propsPage, RelationshipType.CALLS.name()))
+                .extracting(relationship -> relationship.getToNodeId())
+                .containsExactlyInAnyOrder(save, cancel);
+            assertThat(relationships.findOutgoingRelationships(
+                    REDUX_PROJECT, dynamic, RelationshipType.CALLS.name()))
+                .extracting(relationship -> relationship.getToNodeId())
+                .doesNotContain(save, cancel);
+        } finally {
+            try (Driver cleanup = GraphDatabase.driver(uri, AuthTokens.basic(username, password))) {
+                deleteProject(cleanup, REDUX_PROJECT);
+            }
+        }
+    }
+
     private static void add(
             IncrementalUpdateService service,
             String projectName,
@@ -178,5 +241,16 @@ class FrontendProcessParserEndToEndTest {
     private static Path frontendParserRoot() {
         Path cli = Path.of(System.getenv("FRONTEND_CODE_GRAPH_CLI")).toAbsolutePath();
         return cli.getParent().getParent();
+    }
+
+    private static void deleteProject(Driver driver, String projectName) {
+        driver.executableQuery("MATCH (n {projectName: $projectName}) DETACH DELETE n")
+            .withParameters(java.util.Map.of("projectName", projectName))
+            .execute();
+    }
+
+    private static String environmentOrDefault(String name, String defaultValue) {
+        String value = System.getenv(name);
+        return value == null || value.isBlank() ? defaultValue : value;
     }
 }

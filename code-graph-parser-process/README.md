@@ -33,9 +33,9 @@ Enable one or more process parsers with JVM properties:
 
 ```bash
 -Dcodegraph.parser.process.languages=go,python
--Dcodegraph.parser.process.go.command="/path/to/go-parser --stdio-stream"
+-Dcodegraph.parser.process.go.command="/path/to/parser-go --stdio-stream"
 -Dcodegraph.parser.process.go.streaming=true
--Dcodegraph.parser.process.python.command="python3 /path/to/python_parser.py"
+-Dcodegraph.parser.process.python.command="/path/to/parser-python --stdio"
 -Dcodegraph.parser.process.timeoutSeconds=60
 ```
 
@@ -45,7 +45,7 @@ For the frontend React parser:
 
 ```bash
 -Dcodegraph.parser.process.languages=typescript
--Dcodegraph.parser.process.typescript.command="node '/path/to/code-graph-parser-js/dist/cli.js' --stdio"
+-Dcodegraph.parser.process.typescript.command="/path/to/parser-js --stdio"
 ```
 
 For the PHP parser:
@@ -54,7 +54,7 @@ PHP 解析器可以这样接入：
 
 ```bash
 -Dcodegraph.parser.process.languages=php
--Dcodegraph.parser.process.php.command="node '/path/to/code-graph-parser-php/dist/cli.js' --stdio"
+-Dcodegraph.parser.process.php.command="/path/to/parser-php --stdio"
 ```
 
 The same configuration can be supplied with environment variables:
@@ -63,9 +63,9 @@ The same configuration can be supplied with environment variables:
 
 ```bash
 CODEGRAPH_PARSER_PROCESS_LANGUAGES=go,python
-CODEGRAPH_PARSER_GO_COMMAND="/path/to/go-parser --stdio-stream"
+CODEGRAPH_PARSER_GO_COMMAND="/path/to/parser-go --stdio-stream"
 CODEGRAPH_PARSER_GO_STREAMING=true
-CODEGRAPH_PARSER_PYTHON_COMMAND="python3 /path/to/python_parser.py"
+CODEGRAPH_PARSER_PYTHON_COMMAND="/path/to/parser-python --stdio"
 CODEGRAPH_PARSER_PROCESS_TIMEOUT_SECONDS=60
 ```
 
@@ -75,14 +75,14 @@ PHP 环境变量示例：
 
 ```bash
 CODEGRAPH_PARSER_PROCESS_LANGUAGES=php
-CODEGRAPH_PARSER_PHP_COMMAND="node /path/to/code-graph-parser-php/dist/cli.js --stdio"
+CODEGRAPH_PARSER_PHP_COMMAND="/path/to/parser-php --stdio"
 ```
 
 Python parser example:
 
 ```bash
 CODEGRAPH_PARSER_PROCESS_LANGUAGES=python
-CODEGRAPH_PARSER_PYTHON_COMMAND="python3.12 /path/to/code-graph-parser-python/bin/code-graph-parser-python --stdio"
+CODEGRAPH_PARSER_PYTHON_COMMAND="/path/to/parser-python --stdio"
 ```
 
 The language name must match `ParseRequest.language` and the engine language inference.
