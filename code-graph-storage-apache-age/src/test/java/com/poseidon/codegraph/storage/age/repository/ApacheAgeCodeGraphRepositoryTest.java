@@ -49,6 +49,9 @@ class ApacheAgeCodeGraphRepositoryTest {
         relationship.setFromNodeId("unit");
         relationship.setToNodeId("function");
         relationship.setRelationshipType("UNIT_TO_FUNCTION");
+        relationship.setRelationshipKind("CONTAINS");
+        relationship.setFromNodeType("CodeUnit");
+        relationship.setToNodeType("CodeFunction");
         relationship.setProjectName("demo");
         relationship.setLanguage("java");
         return relationship;

@@ -148,22 +148,82 @@ class FrontendProcessParserEndToEndTest {
         String handleSave = TYPE_PROJECT + "::src/page.ts::handleSave()";
 
         assertThat(repository.findOutgoingRelationships(
-                TYPE_PROJECT, userService, RelationshipType.EXTENDS.name()))
+                TYPE_PROJECT, userService, "TS_EXTENDS"))
             .extracting(relationship -> relationship.getToNodeId())
             .containsExactly(baseService);
         assertThat(repository.findOutgoingRelationships(
-                TYPE_PROJECT, userService, RelationshipType.IMPLEMENTS.name()))
+                TYPE_PROJECT, userService, "TS_IMPLEMENTS"))
             .extracting(relationship -> relationship.getToNodeId())
             .containsExactly(apiClient)
             .doesNotContain(wrongApiClient);
         assertThat(repository.findOutgoingRelationships(
-                TYPE_PROJECT, save, RelationshipType.OVERRIDES.name()))
+                TYPE_PROJECT, save, "TS_OVERRIDES"))
             .extracting(relationship -> relationship.getToNodeId())
             .containsExactly(interfaceSave);
         assertThat(repository.findOutgoingRelationships(
                 TYPE_PROJECT, handleSave, RelationshipType.CALLS.name()))
             .extracting(relationship -> relationship.getToNodeId())
             .containsExactly(save);
+    }
+
+    /**
+     * Source oracle: UserService extends BaseService, implements the contracts.ApiClient
+     * (not the same-named type in other.ts), overrides save, and handleSave calls it.
+     * Read-back is from Neo4j after the real parser and Engine storage path.
+     */
+    @Test
+    @EnabledIfEnvironmentVariable(named = "NEO4J_URI", matches = ".+")
+    void typescriptNativeRelationshipsMatchPersistedNeo4jEdges() {
+        String uri = System.getenv("NEO4J_URI");
+        String username = environmentOrDefault("NEO4J_USERNAME", "neo4j");
+        String password = environmentOrDefault("NEO4J_PASSWORD", "password");
+
+        try (Driver driver = GraphDatabase.driver(uri, AuthTokens.basic(username, password))) {
+            driver.verifyConnectivity();
+            deleteProject(driver, TYPE_PROJECT);
+
+            Neo4jCodePackageRepository packages = new Neo4jCodePackageRepository(driver);
+            Neo4jCodeUnitRepository units = new Neo4jCodeUnitRepository(driver);
+            Neo4jCodeFunctionRepository functions = new Neo4jCodeFunctionRepository(driver);
+            Neo4jCodeRelationshipRepository relationships = new Neo4jCodeRelationshipRepository(driver);
+            Neo4jCodeEndpointRepository endpoints = new Neo4jCodeEndpointRepository(driver);
+            IncrementalUpdateService service = new IncrementalUpdateService(
+                packages, units, functions, relationships, endpoints
+            );
+
+            Path projectRoot = frontendParserRoot().resolve("fixtures/type-relations");
+            add(service, TYPE_PROJECT, projectRoot, "src/contracts.ts");
+            add(service, TYPE_PROJECT, projectRoot, "src/other.ts");
+            add(service, TYPE_PROJECT, projectRoot, "src/service.ts");
+            add(service, TYPE_PROJECT, projectRoot, "src/page.ts");
+
+            String userService = TYPE_PROJECT + "::src/service.ts::UserService";
+            String baseService = TYPE_PROJECT + "::src/contracts.ts::BaseService";
+            String apiClient = TYPE_PROJECT + "::src/contracts.ts::ApiClient";
+            String wrongApiClient = TYPE_PROJECT + "::src/other.ts::ApiClient";
+            String save = TYPE_PROJECT + "::src/service.ts::UserService.save()";
+            String interfaceSave = TYPE_PROJECT + "::src/contracts.ts::ApiClient.save()";
+            String handleSave = TYPE_PROJECT + "::src/page.ts::handleSave()";
+
+            assertThat(relationships.findOutgoingRelationships(TYPE_PROJECT, userService, "TS_EXTENDS"))
+                .extracting(relationship -> relationship.getToNodeId())
+                .containsExactly(baseService);
+            assertThat(relationships.findOutgoingRelationships(TYPE_PROJECT, userService, "TS_IMPLEMENTS"))
+                .extracting(relationship -> relationship.getToNodeId())
+                .containsExactly(apiClient)
+                .doesNotContain(wrongApiClient);
+            assertThat(relationships.findOutgoingRelationships(TYPE_PROJECT, save, "TS_OVERRIDES"))
+                .extracting(relationship -> relationship.getToNodeId())
+                .containsExactly(interfaceSave);
+            assertThat(relationships.findOutgoingRelationships(
+                    TYPE_PROJECT, handleSave, RelationshipType.CALLS.name()))
+                .extracting(relationship -> relationship.getToNodeId())
+                .containsExactly(save);
+        } finally {
+            try (Driver cleanup = GraphDatabase.driver(uri, AuthTokens.basic(username, password))) {
+                deleteProject(cleanup, TYPE_PROJECT);
+            }
+        }
     }
 
     /**

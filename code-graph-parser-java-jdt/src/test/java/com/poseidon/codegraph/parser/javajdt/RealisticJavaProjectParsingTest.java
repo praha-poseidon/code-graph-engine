@@ -79,12 +79,12 @@ class RealisticJavaProjectParsingTest {
             .contains("com.poseidon.demo.UserService:class", "com.poseidon.demo.UserApi:interface");
         assertThat(serviceGraph.getRelationshipsAsList())
             .anySatisfy(relationship -> {
-                assertThat(relationship.getRelationshipType()).isEqualTo(RelationshipType.IMPLEMENTS);
+                assertThat(relationship.getRelationshipType()).isEqualTo(JavaRelationshipTypes.IMPLEMENTS);
                 assertThat(relationship.getFromNodeId()).isEqualTo(GraphIds.unitId("com.poseidon.demo.UserService"));
                 assertThat(relationship.getToNodeId()).isEqualTo(GraphIds.unitId("com.poseidon.demo.UserApi"));
             })
             .anySatisfy(relationship -> {
-                assertThat(relationship.getRelationshipType()).isEqualTo(RelationshipType.OVERRIDES);
+                assertThat(relationship.getRelationshipType()).isEqualTo(JavaRelationshipTypes.OVERRIDES);
                 assertThat(relationship.getFromNodeId()).isEqualTo(GraphIds.functionId("com.poseidon.demo.UserService.find(java.lang.String)"));
             });
         assertThat(controllerGraph.getRelationshipsAsList())

@@ -6,6 +6,7 @@ import com.poseidon.codegraph.model.CodeNode;
 import com.poseidon.codegraph.model.CodePackage;
 import com.poseidon.codegraph.model.CodeRelationship;
 import com.poseidon.codegraph.model.CodeUnit;
+import com.poseidon.codegraph.model.RelationshipKind;
 import com.poseidon.codegraph.model.RelationshipType;
 
 import java.util.ArrayList;
@@ -145,6 +146,24 @@ public class GraphDeltaValidator {
                 diagnostics.add(error("relationship.type.required", "relationship relationshipType must not be null", null, relationship.getLineNumber()));
                 continue;
             }
+            RelationshipKind kind = relationship.getRelationshipKind();
+            if (kind == null) {
+                diagnostics.add(error("relationship.kind.required",
+                    "language-specific relationship must declare relationshipKind: " + type,
+                    null, relationship.getLineNumber()));
+            }
+            String fromNodeType = relationship.getFromNodeType();
+            String toNodeType = relationship.getToNodeType();
+            if (blank(fromNodeType)) {
+                diagnostics.add(error("relationship.fromNodeType.required",
+                    "language-specific relationship must declare fromNodeType: " + type,
+                    null, relationship.getLineNumber()));
+            }
+            if (blank(toNodeType)) {
+                diagnostics.add(error("relationship.toNodeType.required",
+                    "language-specific relationship must declare toNodeType: " + type,
+                    null, relationship.getLineNumber()));
+            }
             if (blank(relationship.getLanguage())) {
                 diagnostics.add(error("relationship.language.required", "relationship language must not be blank", null, relationship.getLineNumber()));
             }
@@ -158,14 +177,14 @@ public class GraphDeltaValidator {
             if (!seen.add("key:" + key)) {
                 diagnostics.add(error("relationship.duplicate", "relationship is duplicated in delta: " + key, null, relationship.getLineNumber()));
             }
-            validateRelationshipEndpoint(relationship.getFromNodeId(), type.getFromLabel(), "from", nodeTypes, diagnostics);
-            validateRelationshipEndpoint(relationship.getToNodeId(), type.getToLabel(), "to", nodeTypes, diagnostics);
+            validateRelationshipEndpoint(relationship.getFromNodeId(), fromNodeType, "from", nodeTypes, diagnostics);
+            validateRelationshipEndpoint(relationship.getToNodeId(), toNodeType, "to", nodeTypes, diagnostics);
         }
     }
 
     private void validateRelationshipEndpoint(String nodeId, String expectedType, String side,
                                               Map<String, String> nodeTypes, List<Diagnostic> diagnostics) {
-        if (blank(nodeId)) {
+        if (blank(nodeId) || blank(expectedType)) {
             return;
         }
         String actualType = nodeTypes.get(nodeId);

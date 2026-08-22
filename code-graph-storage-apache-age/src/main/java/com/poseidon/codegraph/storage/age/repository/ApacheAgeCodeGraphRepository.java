@@ -11,7 +11,6 @@ import com.poseidon.codegraph.engine.application.repository.CodeFunctionReposito
 import com.poseidon.codegraph.engine.application.repository.CodePackageRepository;
 import com.poseidon.codegraph.engine.application.repository.CodeRelationshipRepository;
 import com.poseidon.codegraph.engine.application.repository.CodeUnitRepository;
-import com.poseidon.codegraph.model.RelationshipType;
 import org.springframework.stereotype.Repository;
 
 import java.util.LinkedHashSet;
@@ -19,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 @Repository
 public class ApacheAgeCodeGraphRepository implements
@@ -27,6 +27,8 @@ public class ApacheAgeCodeGraphRepository implements
         CodeFunctionRepository,
         CodeEndpointRepository,
         CodeRelationshipRepository {
+
+    private static final Pattern SAFE_IDENTIFIER = Pattern.compile("[A-Za-z][A-Za-z0-9_]*");
 
     private final ApacheAgeCypher age;
 
@@ -187,10 +189,12 @@ public class ApacheAgeCodeGraphRepository implements
     @Override
     public List<FileMetaInfo> findWhoCallsMeWithMeta(String projectName, String targetProjectFilePath) {
         return age.query("""
-            MATCH (caller:CodeFunction)-[:CALLS]->(callee:CodeFunction)
-            WHERE caller.projectName = %s AND callee.projectName = %s AND callee.projectFilePath = %s
+            MATCH (caller:CodeFunction)-[r]->(callee:CodeFunction)
+            WHERE caller.projectName = %s AND callee.projectName = %s
+              AND r.projectName = %s AND r.relationshipKind = 'CALL'
+              AND callee.projectFilePath = %s
             RETURN caller.projectFilePath
-            """.formatted(age.value(projectName), age.value(projectName), age.value(targetProjectFilePath))).stream()
+            """.formatted(age.value(projectName), age.value(projectName), age.value(projectName), age.value(targetProjectFilePath))).stream()
             .map(row -> {
                 FileMetaInfo meta = new FileMetaInfo();
                 meta.setProjectFilePath(text(row));
@@ -202,10 +206,11 @@ public class ApacheAgeCodeGraphRepository implements
     @Override
     public void deleteFileOutgoingCalls(String projectName, String projectFilePath) {
         age.execute("""
-            MATCH (caller:CodeFunction)-[r:CALLS]->()
-            WHERE caller.projectName = %s AND caller.projectFilePath = %s
+            MATCH (caller:CodeFunction)-[r]->()
+            WHERE caller.projectName = %s AND r.projectName = %s
+              AND r.relationshipKind = 'CALL' AND caller.projectFilePath = %s
             DELETE r
-            """.formatted(age.value(projectName), age.value(projectFilePath)));
+            """.formatted(age.value(projectName), age.value(projectName), age.value(projectFilePath)));
     }
 
     @Override
@@ -215,6 +220,9 @@ public class ApacheAgeCodeGraphRepository implements
 
     @Override
     public List<CodeRelationshipDO> findOutgoingRelationships(String projectName, String nodeId, String relationshipType) {
+        if (relationshipType != null && !relationshipType.isBlank()) {
+            requireSafeIdentifier(relationshipType, "relationship type");
+        }
         String type = relationshipType == null || relationshipType.isBlank() ? "" : ":" + relationshipType;
         return age.query("""
             MATCH (from {id: %s})-[r%s]->()
@@ -227,6 +235,9 @@ public class ApacheAgeCodeGraphRepository implements
 
     @Override
     public List<CodeRelationshipDO> findIncomingRelationships(String projectName, String nodeId, String relationshipType) {
+        if (relationshipType != null && !relationshipType.isBlank()) {
+            requireSafeIdentifier(relationshipType, "relationship type");
+        }
         String type = relationshipType == null || relationshipType.isBlank() ? "" : ":" + relationshipType;
         return age.query("""
             MATCH ()-[r%s]->(to {id: %s})
@@ -244,6 +255,7 @@ public class ApacheAgeCodeGraphRepository implements
         }
         Set<String> existing = new LinkedHashSet<>();
         for (CodeRelationshipDO relationship : relationships) {
+            requireSafeIdentifier(relationship.getRelationshipType(), "relationship type");
             List<Map<String, Object>> rows = age.query("""
                 MATCH (from {id: %s})-[r:%s]->(to {id: %s})
                 WHERE from.projectName = %s
@@ -273,7 +285,9 @@ public class ApacheAgeCodeGraphRepository implements
     }
 
     private void mergeRelationship(CodeRelationshipDO relationship) {
-        RelationshipType type = RelationshipType.valueOf(relationship.getRelationshipType());
+        requireSafeIdentifier(relationship.getRelationshipType(), "relationship type");
+        requireSafeIdentifier(relationship.getFromNodeType(), "from node type");
+        requireSafeIdentifier(relationship.getToNodeType(), "to node type");
         age.execute("""
             MATCH (from:%s {id: %s, projectName: %s})
             MATCH (to:%s {id: %s, projectName: %s})
@@ -281,10 +295,10 @@ public class ApacheAgeCodeGraphRepository implements
             SET r += %s
             RETURN r
             """.formatted(
-            type.getFromLabel(),
+            relationship.getFromNodeType(),
             age.value(relationship.getFromNodeId()),
             age.value(relationship.getProjectName()),
-            type.getToLabel(),
+            relationship.getToNodeType(),
             age.value(relationship.getToNodeId()),
             age.value(relationship.getProjectName()),
             relationship.getRelationshipType(),
@@ -371,13 +385,16 @@ public class ApacheAgeCodeGraphRepository implements
     }
 
     private Map<String, ?> relationshipProps(CodeRelationshipDO relationship) {
-        return Map.of(
-            "id", relationship.getId(),
-            "fromNodeId", relationship.getFromNodeId(),
-            "toNodeId", relationship.getToNodeId(),
-            "relationshipType", relationship.getRelationshipType(),
-            "projectName", relationship.getProjectName(),
-            "language", value(relationship.getLanguage()));
+        return Map.ofEntries(
+            Map.entry("id", relationship.getId()),
+            Map.entry("fromNodeId", relationship.getFromNodeId()),
+            Map.entry("toNodeId", relationship.getToNodeId()),
+            Map.entry("relationshipType", relationship.getRelationshipType()),
+            Map.entry("relationshipKind", relationship.getRelationshipKind()),
+            Map.entry("fromNodeType", relationship.getFromNodeType()),
+            Map.entry("toNodeType", relationship.getToNodeType()),
+            Map.entry("projectName", relationship.getProjectName()),
+            Map.entry("language", value(relationship.getLanguage())));
     }
 
     private Object value(Object value) {
@@ -424,5 +441,11 @@ public class ApacheAgeCodeGraphRepository implements
 
     private <T> List<T> safe(List<T> values) {
         return values == null ? List.of() : values;
+    }
+
+    private void requireSafeIdentifier(String value, String field) {
+        if (value == null || !SAFE_IDENTIFIER.matcher(value).matches()) {
+            throw new IllegalArgumentException("Unsafe " + field + ": " + value);
+        }
     }
 }

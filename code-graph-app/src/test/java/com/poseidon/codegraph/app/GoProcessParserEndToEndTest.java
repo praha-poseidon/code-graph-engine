@@ -79,10 +79,10 @@ class GoProcessParserEndToEndTest {
         String interfaceGreet = PROJECT + "::fn:example.com/iface.Greeter.Greet";
         String speak = PROJECT + "::fn:example.com/iface.Speak";
 
-        assertThat(repository.findOutgoingRelationships(PROJECT, person, RelationshipType.IMPLEMENTS.name()))
+        assertThat(repository.findOutgoingRelationships(PROJECT, person, "GO_SATISFIES"))
             .extracting(relationship -> relationship.getToNodeId())
             .contains(greeter);
-        assertThat(repository.findOutgoingRelationships(PROJECT, personGreet, RelationshipType.OVERRIDES.name()))
+        assertThat(repository.findOutgoingRelationships(PROJECT, personGreet, "GO_METHOD_SATISFIES"))
             .extracting(relationship -> relationship.getToNodeId())
             .contains(interfaceGreet);
         assertThat(repository.findOutgoingRelationships(PROJECT, speak, RelationshipType.CALLS.name()))
@@ -138,11 +138,11 @@ class GoProcessParserEndToEndTest {
             String speak = PROJECT + "::fn:example.com/iface.Speak";
 
             assertThat(relationships.findOutgoingRelationships(
-                    PROJECT, person, RelationshipType.IMPLEMENTS.name()))
+                    PROJECT, person, "GO_SATISFIES"))
                 .extracting(relationship -> relationship.getToNodeId())
                 .containsExactly(greeter);
             assertThat(relationships.findOutgoingRelationships(
-                    PROJECT, personGreet, RelationshipType.OVERRIDES.name()))
+                    PROJECT, personGreet, "GO_METHOD_SATISFIES"))
                 .extracting(relationship -> relationship.getToNodeId())
                 .containsExactly(interfaceGreet);
             assertThat(relationships.findOutgoingRelationships(

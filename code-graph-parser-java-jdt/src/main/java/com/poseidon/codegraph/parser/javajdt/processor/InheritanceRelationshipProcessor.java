@@ -4,6 +4,7 @@ import com.poseidon.codegraph.model.CodeRelationship;
 import com.poseidon.codegraph.model.RelationshipType;
 import com.poseidon.codegraph.parser.javajdt.ASTNodeProcessor;
 import com.poseidon.codegraph.parser.javajdt.JdtGraphIds;
+import com.poseidon.codegraph.parser.javajdt.JavaRelationshipTypes;
 import com.poseidon.codegraph.parser.javajdt.ProcessorContext;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jdt.core.dom.AbstractTypeDeclaration;
@@ -25,12 +26,12 @@ public class InheritanceRelationshipProcessor implements ASTNodeProcessor {
 
         ITypeBinding superClass = binding.getSuperclass();
         if (superClass != null && !"java.lang.Object".equals(superClass.getQualifiedName())) {
-            addRelationship(binding, superClass, RelationshipType.EXTENDS, context);
+            addRelationship(binding, superClass, JavaRelationshipTypes.EXTENDS, context);
         }
 
         if (binding.isInterface()) {
             for (ITypeBinding superInterface : binding.getInterfaces()) {
-                addRelationship(binding, superInterface, RelationshipType.EXTENDS, context);
+                addRelationship(binding, superInterface, JavaRelationshipTypes.EXTENDS, context);
             }
         }
     }
@@ -47,7 +48,7 @@ public class InheritanceRelationshipProcessor implements ASTNodeProcessor {
         }
 
         CodeRelationship rel = new CodeRelationship();
-        rel.setRelationshipType(relationshipType);
+        JavaRelationshipTypes.apply(rel, relationshipType);
         rel.setFromNodeId(fromId);
         rel.setToNodeId(toId);
         rel.setId(JdtGraphIds.relationshipId(fromId, relationshipType, toId));

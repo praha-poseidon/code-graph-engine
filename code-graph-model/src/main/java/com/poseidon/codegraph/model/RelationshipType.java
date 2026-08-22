@@ -1,89 +1,138 @@
 package com.poseidon.codegraph.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
+
 /**
- * 关系类型枚举
- * 每个关系类型定义了源节点和目标节点的标签，用于 Neo4j 查询和关系创建
+ * Extensible graph relationship name.
+ *
+ * <p>Unlike an enum, this value accepts language-owned names such as
+ * {@code GO_SATISFIES} or {@code PHP_USES_TRAIT}. Only genuinely shared edge
+ * names live here. Language adapters own their native relationship vocabulary.</p>
  */
-public enum RelationshipType {
-    /**
-     * 函数调用关系
-     */
-    CALLS("CodeFunction", "CodeFunction"),
+public final class RelationshipType {
 
-    /**
-     * React/Vue 等组件渲染关系：父组件函数 → 子组件函数
-     */
-    RENDERS("CodeFunction", "CodeFunction"),
-    
-    /**
-     * 包包含单元
-     */
-    PACKAGE_TO_UNIT("CodePackage", "CodeUnit"),
+    private static final Pattern SAFE_NAME = Pattern.compile("[A-Z][A-Z0-9_]*");
+    private static final Map<String, RelationshipType> INTERNED = new ConcurrentHashMap<>();
 
-    /**
-     * 目录包层级（父目录 package → 子目录 package）
-     */
-    PACKAGE_TO_PACKAGE("CodePackage", "CodePackage"),
-    
-    /**
-     * 单元包含函数
-     */
-    UNIT_TO_FUNCTION("CodeUnit", "CodeFunction"),
+    public static final RelationshipType CALLS = declared(
+        "CALLS", RelationshipKind.CALL, "CodeFunction", "CodeFunction");
+    public static final RelationshipType RENDERS = declared(
+        "RENDERS", RelationshipKind.RENDERS, "CodeFunction", "CodeFunction");
+    public static final RelationshipType PACKAGE_TO_UNIT = declared(
+        "PACKAGE_TO_UNIT", RelationshipKind.CONTAINS, "CodePackage", "CodeUnit");
+    public static final RelationshipType PACKAGE_TO_PACKAGE = declared(
+        "PACKAGE_TO_PACKAGE", RelationshipKind.CONTAINS, "CodePackage", "CodePackage");
+    public static final RelationshipType UNIT_TO_FUNCTION = declared(
+        "UNIT_TO_FUNCTION", RelationshipKind.CONTAINS, "CodeUnit", "CodeFunction");
+    public static final RelationshipType ENDPOINT_TO_FUNCTION = declared(
+        "ENDPOINT_TO_FUNCTION", RelationshipKind.BINDS_ENDPOINT, "CodeEndpoint", "CodeFunction");
+    public static final RelationshipType FUNCTION_TO_ENDPOINT = declared(
+        "FUNCTION_TO_ENDPOINT", RelationshipKind.BINDS_ENDPOINT, "CodeFunction", "CodeEndpoint");
+    public static final RelationshipType MATCHES = declared(
+        "MATCHES", RelationshipKind.MATCHES_ENDPOINT, "CodeEndpoint", "CodeEndpoint");
 
-    /**
-     * 单元继承单元（class extends class、interface extends interface）
-     */
-    EXTENDS("CodeUnit", "CodeUnit"),
+    private static final List<RelationshipType> DECLARED_TYPES = List.of(
+        CALLS,
+        RENDERS,
+        PACKAGE_TO_UNIT,
+        PACKAGE_TO_PACKAGE,
+        UNIT_TO_FUNCTION,
+        ENDPOINT_TO_FUNCTION,
+        FUNCTION_TO_ENDPOINT,
+        MATCHES
+    );
 
-    /**
-     * 单元实现接口（class/enum implements interface）
-     */
-    IMPLEMENTS("CodeUnit", "CodeUnit"),
+    private final String name;
+    private final RelationshipKind defaultKind;
+    private final String defaultFromNodeType;
+    private final String defaultToNodeType;
 
-    /**
-     * 函数重写父类或接口函数
-     */
-    OVERRIDES("CodeFunction", "CodeFunction"),
-
-    /**
-     * 端点到函数（入站端点，如 HTTP 请求进入某个 Controller 方法）
-     */
-    ENDPOINT_TO_FUNCTION("CodeEndpoint", "CodeFunction"),
-    
-    /**
-     * 函数到端点（出站端点，如函数调用外部 API）
-     */
-    FUNCTION_TO_ENDPOINT("CodeFunction", "CodeEndpoint"),
-    
-    /**
-     * 端点匹配关系（跨服务）
-     * - 连接 matchIdentity 字符串完全相同的 outbound 和 inbound endpoint
-     * - 方向：outbound -> inbound（从调用方指向提供方）
-     * - 用于级联感知：删除/修改一端时可以找到所有匹配的另一端
-     * - 注意：不创建 placeholder 端点，只在两端都存在时才创建关系
-     */
-    MATCHES("CodeEndpoint", "CodeEndpoint");
-    
-    /**
-     * 源节点的 Neo4j 标签
-     */
-    private final String fromLabel;
-    
-    /**
-     * 目标节点的 Neo4j 标签
-     */
-    private final String toLabel;
-    
-    RelationshipType(String fromLabel, String toLabel) {
-        this.fromLabel = fromLabel;
-        this.toLabel = toLabel;
+    private RelationshipType(String name, RelationshipKind defaultKind,
+                             String defaultFromNodeType, String defaultToNodeType) {
+        this.name = name;
+        this.defaultKind = defaultKind;
+        this.defaultFromNodeType = defaultFromNodeType;
+        this.defaultToNodeType = defaultToNodeType;
     }
-    
+
+    private static RelationshipType declared(String name, RelationshipKind kind,
+                                             String fromNodeType, String toNodeType) {
+        validateName(name);
+        RelationshipType type = new RelationshipType(name, kind, fromNodeType, toNodeType);
+        RelationshipType previous = INTERNED.putIfAbsent(name, type);
+        return previous == null ? type : previous;
+    }
+
+    /**
+     * Resolves any safe relationship name. Unknown names intentionally have no
+     * Engine metadata; their parser must send kind and endpoint node types.
+     */
+    @JsonCreator
+    public static RelationshipType valueOf(String name) {
+        if (name == null) {
+            return null;
+        }
+        String normalized = name.trim().toUpperCase();
+        validateName(normalized);
+        return INTERNED.computeIfAbsent(normalized,
+            key -> new RelationshipType(key, null, null, null));
+    }
+
+    public static RelationshipType of(String name) {
+        return valueOf(name);
+    }
+
+    /** Declared shared types only; dynamic language types are not centralized here. */
+    public static RelationshipType[] values() {
+        return DECLARED_TYPES.toArray(RelationshipType[]::new);
+    }
+
+    @JsonValue
+    public String name() {
+        return name;
+    }
+
+    public RelationshipKind getDefaultKind() {
+        return defaultKind;
+    }
+
     public String getFromLabel() {
-        return fromLabel;
+        return defaultFromNodeType;
     }
-    
+
     public String getToLabel() {
-        return toLabel;
+        return defaultToNodeType;
+    }
+
+    public boolean is(String expectedName) {
+        return expectedName != null && name.equals(expectedName);
+    }
+
+    private static void validateName(String name) {
+        if (name == null || !SAFE_NAME.matcher(name).matches()) {
+            throw new IllegalArgumentException("Unsafe relationship type name: " + name);
+        }
+    }
+
+    @Override
+    public String toString() {
+        return name;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return this == other || other instanceof RelationshipType that && name.equals(that.name);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name);
     }
 }

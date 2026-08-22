@@ -9,6 +9,7 @@ import com.poseidon.codegraph.model.CodeUnit;
 import com.poseidon.codegraph.model.EndpointType;
 import com.poseidon.codegraph.model.GraphIds;
 import com.poseidon.codegraph.model.RelationshipType;
+import com.poseidon.codegraph.model.RelationshipKind;
 import com.poseidon.codegraph.model.endpoint.HttpEndpoint;
 import org.junit.jupiter.api.Test;
 
@@ -83,6 +84,37 @@ class GraphDeltaValidatorTest {
                 .stream().map(Diagnostic::code).toList();
             assertEquals(List.of("relationship.from.type.invalid"), codes, type.name());
         }
+    }
+
+    @Test
+    void acceptsLanguageOwnedRelationshipWithExplicitContract() {
+        CodeUnit implementation = unit("demo.UserService");
+        CodeUnit contract = unit("demo.Service");
+        CodeRelationship relationship = relationship(
+            implementation.getId(), contract.getId(), RelationshipType.of("GO_SATISFIES"));
+        relationship.setRelationshipKind(RelationshipKind.CONFORMS);
+        relationship.setFromNodeType("CodeUnit");
+        relationship.setToNodeType("CodeUnit");
+
+        assertDoesNotThrow(() -> validator.validateOrThrow(
+            delta(List.of(implementation, contract), List.of(), List.of(relationship))));
+    }
+
+    @Test
+    void rejectsLanguageOwnedRelationshipWithoutBehaviorAndEndpointContract() {
+        CodeUnit implementation = unit("demo.UserService");
+        CodeUnit contract = unit("demo.Service");
+        CodeRelationship relationship = relationship(
+            implementation.getId(), contract.getId(), RelationshipType.of("GO_SATISFIES"));
+
+        List<String> codes = validator.validate(
+            delta(List.of(implementation, contract), List.of(), List.of(relationship)))
+            .stream().map(Diagnostic::code).toList();
+
+        assertEquals(List.of(
+            "relationship.kind.required",
+            "relationship.fromNodeType.required",
+            "relationship.toNodeType.required"), codes);
     }
 
     @Test

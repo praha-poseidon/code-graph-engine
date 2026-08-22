@@ -233,7 +233,7 @@ public class InMemoryCodeGraphRepository implements
             .collect(Collectors.toSet());
         return relationships.values().stream()
             .filter(relationship -> sameProject(projectName, relationship.getProjectName()))
-            .filter(relationship -> "CALLS".equals(relationship.getRelationshipType()))
+            .filter(relationship -> "CALL".equals(relationship.getRelationshipKind()))
             .filter(relationship -> calleeIds.contains(relationship.getToNodeId()))
             .map(relationship -> functions.get(relationship.getFromNodeId()))
             .filter(Objects::nonNull)
@@ -251,7 +251,7 @@ public class InMemoryCodeGraphRepository implements
             .collect(Collectors.toSet());
         relationships.values().removeIf(relationship ->
             sameProject(projectName, relationship.getProjectName())
-                && "CALLS".equals(relationship.getRelationshipType())
+                && "CALL".equals(relationship.getRelationshipKind())
                 && callerIds.contains(relationship.getFromNodeId()));
     }
 

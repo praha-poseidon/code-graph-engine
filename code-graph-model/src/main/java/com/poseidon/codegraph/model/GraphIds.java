@@ -53,6 +53,10 @@ public final class GraphIds {
         return "rel:" + sha1(normalize(fromNodeId) + "|" + (type == null ? "" : type.name()) + "|" + normalize(toNodeId));
     }
 
+    public static String relationshipId(String fromNodeId, String type, String toNodeId) {
+        return "rel:" + sha1(normalize(fromNodeId) + "|" + normalize(type) + "|" + normalize(toNodeId));
+    }
+
     public static String placeholderFunctionId(String qualifiedSignature) {
         return "placeholder:" + functionId(qualifiedSignature);
     }

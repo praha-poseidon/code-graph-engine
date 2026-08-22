@@ -15,11 +15,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Repository
 @ConditionalOnProperty(name = "code-graph.storage.type", havingValue = "neo4j")
 public class Neo4jCodeRelationshipRepository implements CodeRelationshipRepository {
+
+    private static final Pattern SAFE_IDENTIFIER = Pattern.compile("[A-Za-z][A-Za-z0-9_]*");
 
     private final Driver neo4jDriver;
 
@@ -31,9 +34,11 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
     public List<String> findWhoCallsMe(String projectName, String targetProjectFilePath) {
         log.debug("查询依赖文件: targetFile={}", targetProjectFilePath);
         String cypher = """
-            MATCH (caller:CodeFunction)-[:CALLS]->(callee:CodeFunction)
+            MATCH (caller:CodeFunction)-[r]->(callee:CodeFunction)
             WHERE callee.projectName = $projectName
               AND caller.projectName = $projectName
+              AND r.projectName = $projectName
+              AND r.relationshipKind = 'CALL'
               AND callee.projectFilePath = $targetProjectFilePath
             RETURN DISTINCT caller.projectFilePath AS projectFilePath
             """;
@@ -56,9 +61,11 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
     public List<FileMetaInfo> findWhoCallsMeWithMeta(String projectName, String targetProjectFilePath) {
         log.debug("查询依赖文件（带 Git 元信息）: targetFile={}", targetProjectFilePath);
         String cypher = """
-            MATCH (caller:CodeFunction)-[:CALLS]->(callee:CodeFunction)
+            MATCH (caller:CodeFunction)-[r]->(callee:CodeFunction)
             WHERE callee.projectName = $projectName
               AND caller.projectName = $projectName
+              AND r.projectName = $projectName
+              AND r.relationshipKind = 'CALL'
               AND callee.projectFilePath = $targetProjectFilePath
             RETURN DISTINCT 
                 caller.projectFilePath AS projectFilePath,
@@ -92,8 +99,10 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
     public void deleteFileOutgoingCalls(String projectName, String projectFilePath) {
         log.debug("删除文件出边: file={}", projectFilePath);
         String cypher = """
-            MATCH (caller:CodeFunction)-[r:CALLS]->()
+            MATCH (caller:CodeFunction)-[r]->()
             WHERE caller.projectName = $projectName
+              AND r.projectName = $projectName
+              AND r.relationshipKind = 'CALL'
               AND caller.projectFilePath = $projectFilePath
             DELETE r
             """;
@@ -138,15 +147,22 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
         Map<String, List<CodeRelationshipDO>> groupedByType = relationships.stream()
             .collect(Collectors.groupingBy(CodeRelationshipDO::getRelationshipType));
         
-        // 对每种类型的关系，使用枚举中的标签信息构造 Cypher 并执行
+        // Relationship names and endpoint labels are parser-owned protocol data.
+        // Validate identifiers before interpolating them into Cypher.
         groupedByType.forEach((typeName, rels) -> {
             try {
-                // 从枚举获取标签信息
-                com.poseidon.codegraph.model.RelationshipType relType = 
-                    com.poseidon.codegraph.model.RelationshipType.valueOf(typeName);
-                
-                String fromLabel = relType.getFromLabel();
-                String toLabel = relType.getToLabel();
+                CodeRelationshipDO contract = rels.get(0);
+                String fromLabel = contract.getFromNodeType();
+                String toLabel = contract.getToNodeType();
+                requireSafeIdentifier(typeName, "relationship type");
+                requireSafeIdentifier(fromLabel, "from node type");
+                requireSafeIdentifier(toLabel, "to node type");
+                boolean mixedContract = rels.stream().anyMatch(rel ->
+                    !java.util.Objects.equals(fromLabel, rel.getFromNodeType())
+                        || !java.util.Objects.equals(toLabel, rel.getToNodeType()));
+                if (mixedContract) {
+                    throw new IllegalArgumentException("Relationship type has inconsistent endpoint contract: " + typeName);
+                }
                 
                 // 构造通用 Cypher（标签从枚举获取，不再硬编码）
                 String cypher = buildInsertCypher(fromLabel, toLabel, typeName);
@@ -197,6 +213,9 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
                 r.fromNodeId = rel.fromNodeId,
                 r.toNodeId = rel.toNodeId,
                 r.relationshipType = rel.relationshipType,
+                r.relationshipKind = rel.relationshipKind,
+                r.fromNodeType = rel.fromNodeType,
+                r.toNodeType = rel.toNodeType,
                 r.lineNumber = rel.lineNumber,
                 r.callType = rel.callType,
                 r.language = rel.language,
@@ -213,6 +232,9 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
         map.put("fromNodeId", relationship.getFromNodeId());
         map.put("toNodeId", relationship.getToNodeId());
         map.put("relationshipType", relationship.getRelationshipType());
+        map.put("relationshipKind", relationship.getRelationshipKind());
+        map.put("fromNodeType", relationship.getFromNodeType());
+        map.put("toNodeType", relationship.getToNodeType());
         map.put("lineNumber", relationship.getLineNumber());
         map.put("callType", relationship.getCallType());
         map.put("language", relationship.getLanguage());
@@ -264,6 +286,9 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
         relationship.setFromNodeId((String) map.get("fromNodeId"));
         relationship.setToNodeId((String) map.get("toNodeId"));
         relationship.setRelationshipType((String) map.get("relationshipType"));
+        relationship.setRelationshipKind((String) map.get("relationshipKind"));
+        relationship.setFromNodeType((String) map.get("fromNodeType"));
+        relationship.setToNodeType((String) map.get("toNodeType"));
         relationship.setLineNumber(map.get("lineNumber") instanceof Number number ? number.intValue() : null);
         relationship.setCallType((String) map.get("callType"));
         relationship.setLanguage((String) map.get("language"));
@@ -305,6 +330,12 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
                 .stream()
                 .map(record -> record.get("key").asString())
                 .collect(Collectors.toSet());
+        }
+    }
+
+    private void requireSafeIdentifier(String value, String field) {
+        if (value == null || !SAFE_IDENTIFIER.matcher(value).matches()) {
+            throw new IllegalArgumentException("Unsafe " + field + ": " + value);
         }
     }
 }

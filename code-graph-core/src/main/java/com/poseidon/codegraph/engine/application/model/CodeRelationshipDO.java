@@ -21,9 +21,16 @@ public class CodeRelationshipDO {
     private String toNodeId;
     
     /**
-     * 关系类型：CALLS, PACKAGE_TO_UNIT, UNIT_TO_FUNCTION
+     * 持久化的原生关系名，包括公共类型和语言自有类型。
      */
     private String relationshipType;
+
+    /** Engine-level behavior, independent of the language-owned edge name. */
+    private String relationshipKind;
+
+    /** Endpoint node labels supplied by the parser relationship contract. */
+    private String fromNodeType;
+    private String toNodeType;
     
     /**
      * 调用位置行号（仅用于 CALLS 关系）

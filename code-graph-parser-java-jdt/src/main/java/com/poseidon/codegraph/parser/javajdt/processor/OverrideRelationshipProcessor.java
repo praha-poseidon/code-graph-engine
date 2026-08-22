@@ -4,6 +4,7 @@ import com.poseidon.codegraph.model.CodeRelationship;
 import com.poseidon.codegraph.model.RelationshipType;
 import com.poseidon.codegraph.parser.javajdt.ASTNodeProcessor;
 import com.poseidon.codegraph.parser.javajdt.JdtGraphIds;
+import com.poseidon.codegraph.parser.javajdt.JavaRelationshipTypes;
 import com.poseidon.codegraph.parser.javajdt.ProcessorContext;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jdt.core.dom.AbstractTypeDeclaration;
@@ -99,10 +100,10 @@ public class OverrideRelationshipProcessor implements ASTNodeProcessor {
             return;
         }
         CodeRelationship rel = new CodeRelationship();
-        rel.setRelationshipType(RelationshipType.OVERRIDES);
+        JavaRelationshipTypes.apply(rel, JavaRelationshipTypes.OVERRIDES);
         rel.setFromNodeId(overridingId);
         rel.setToNodeId(overriddenId);
-        rel.setId(JdtGraphIds.relationshipId(overridingId, RelationshipType.OVERRIDES, overriddenId));
+        rel.setId(JdtGraphIds.relationshipId(overridingId, JavaRelationshipTypes.OVERRIDES, overriddenId));
         rel.setLanguage("java");
         context.getGraph().addRelationship(rel);
     }

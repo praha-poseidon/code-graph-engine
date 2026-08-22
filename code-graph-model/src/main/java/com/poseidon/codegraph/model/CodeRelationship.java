@@ -33,6 +33,17 @@ public class CodeRelationship {
      * 关系类型
      */
     private RelationshipType relationshipType;
+
+    /**
+     * Language-neutral behavior used by Engine services. For declared shared
+     * types this defaults from {@link #relationshipType}; language-specific
+     * types must provide it in GraphDelta.
+     */
+    private RelationshipKind relationshipKind;
+
+    /** Parser-declared endpoint node contracts (Neo4j labels). */
+    private String fromNodeType;
+    private String toNodeType;
     
     /**
      * 调用位置行号（仅用于 CALLS 关系）
@@ -53,4 +64,29 @@ public class CodeRelationship {
      * 所属项目名称。
      */
     private String projectName;
+
+    public RelationshipKind getRelationshipKind() {
+        if (relationshipKind != null) {
+            return relationshipKind;
+        }
+        return relationshipType == null ? null : relationshipType.getDefaultKind();
+    }
+
+    public String getFromNodeType() {
+        if (fromNodeType != null && !fromNodeType.isBlank()) {
+            return fromNodeType;
+        }
+        return relationshipType == null ? null : relationshipType.getFromLabel();
+    }
+
+    public String getToNodeType() {
+        if (toNodeType != null && !toNodeType.isBlank()) {
+            return toNodeType;
+        }
+        return relationshipType == null ? null : relationshipType.getToLabel();
+    }
+
+    public boolean hasKind(RelationshipKind kind) {
+        return kind != null && kind == getRelationshipKind();
+    }
 }
