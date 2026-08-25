@@ -3,7 +3,6 @@ package com.poseidon.codegraph.parser.javajdt;
 import com.poseidon.codegraph.model.CodeGraph;
 import com.poseidon.codegraph.model.GraphIds;
 import com.poseidon.codegraph.model.RelationshipType;
-import com.poseidon.codegraph.model.RelationshipKind;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTParser;
@@ -62,7 +61,6 @@ class ASTTraverserStructureTest {
         assertThat(graph.getRelationshipsAsList())
                 .anySatisfy(rel -> {
                     assertThat(rel.getRelationshipType()).isEqualTo(JavaRelationshipTypes.IMPLEMENTS);
-                    assertThat(rel.getRelationshipKind()).isEqualTo(RelationshipKind.CONFORMS);
                     assertThat(rel.getFromNodeType()).isEqualTo("CodeUnit");
                     assertThat(rel.getToNodeType()).isEqualTo("CodeUnit");
                     assertThat(rel.getFromNodeId()).isEqualTo(GraphIds.unitId("com.example.Status"));
@@ -70,13 +68,11 @@ class ASTTraverserStructureTest {
                 })
                 .anySatisfy(rel -> {
                     assertThat(rel.getRelationshipType()).isEqualTo(JavaRelationshipTypes.EXTENDS);
-                    assertThat(rel.getRelationshipKind()).isEqualTo(RelationshipKind.SPECIALIZES);
                     assertThat(rel.getFromNodeId()).isEqualTo(GraphIds.unitId("com.example.Child"));
                     assertThat(rel.getToNodeId()).isEqualTo(GraphIds.unitId("com.example.Base"));
                 })
                 .anySatisfy(rel -> {
                     assertThat(rel.getRelationshipType()).isEqualTo(JavaRelationshipTypes.OVERRIDES);
-                    assertThat(rel.getRelationshipKind()).isEqualTo(RelationshipKind.REFINES);
                     assertThat(rel.getFromNodeType()).isEqualTo("CodeFunction");
                     assertThat(rel.getToNodeType()).isEqualTo("CodeFunction");
                     assertThat(rel.getFromNodeId()).isEqualTo(GraphIds.functionId("com.example.Child.get()"));

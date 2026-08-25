@@ -231,7 +231,6 @@ class InMemoryCodeGraphRepositoryTest {
         relationship.setFromNodeId(from);
         relationship.setToNodeId(to);
         relationship.setRelationshipType(type);
-        relationship.setRelationshipKind("CALLS".equals(type) ? "CALL" : "CONTAINS");
         relationship.setFromNodeType("CodeFunction");
         relationship.setToNodeType("CodeFunction");
         return relationship;

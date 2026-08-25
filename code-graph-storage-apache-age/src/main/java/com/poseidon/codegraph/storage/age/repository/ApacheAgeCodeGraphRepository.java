@@ -189,12 +189,10 @@ public class ApacheAgeCodeGraphRepository implements
     @Override
     public List<FileMetaInfo> findWhoCallsMeWithMeta(String projectName, String targetProjectFilePath) {
         return age.query("""
-            MATCH (caller:CodeFunction)-[r]->(callee:CodeFunction)
-            WHERE caller.projectName = %s AND callee.projectName = %s
-              AND r.projectName = %s AND r.relationshipKind = 'CALL'
-              AND callee.projectFilePath = %s
+            MATCH (caller:CodeFunction)-[:CALLS]->(callee:CodeFunction)
+            WHERE caller.projectName = %s AND callee.projectName = %s AND callee.projectFilePath = %s
             RETURN caller.projectFilePath
-            """.formatted(age.value(projectName), age.value(projectName), age.value(projectName), age.value(targetProjectFilePath))).stream()
+            """.formatted(age.value(projectName), age.value(projectName), age.value(targetProjectFilePath))).stream()
             .map(row -> {
                 FileMetaInfo meta = new FileMetaInfo();
                 meta.setProjectFilePath(text(row));
@@ -206,11 +204,10 @@ public class ApacheAgeCodeGraphRepository implements
     @Override
     public void deleteFileOutgoingCalls(String projectName, String projectFilePath) {
         age.execute("""
-            MATCH (caller:CodeFunction)-[r]->()
-            WHERE caller.projectName = %s AND r.projectName = %s
-              AND r.relationshipKind = 'CALL' AND caller.projectFilePath = %s
+            MATCH (caller:CodeFunction)-[r:CALLS]->()
+            WHERE caller.projectName = %s AND caller.projectFilePath = %s
             DELETE r
-            """.formatted(age.value(projectName), age.value(projectName), age.value(projectFilePath)));
+            """.formatted(age.value(projectName), age.value(projectFilePath)));
     }
 
     @Override
@@ -390,7 +387,6 @@ public class ApacheAgeCodeGraphRepository implements
             Map.entry("fromNodeId", relationship.getFromNodeId()),
             Map.entry("toNodeId", relationship.getToNodeId()),
             Map.entry("relationshipType", relationship.getRelationshipType()),
-            Map.entry("relationshipKind", relationship.getRelationshipKind()),
             Map.entry("fromNodeType", relationship.getFromNodeType()),
             Map.entry("toNodeType", relationship.getToNodeType()),
             Map.entry("projectName", relationship.getProjectName()),

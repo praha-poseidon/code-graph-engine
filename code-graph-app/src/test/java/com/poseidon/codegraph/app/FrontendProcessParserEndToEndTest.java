@@ -148,16 +148,16 @@ class FrontendProcessParserEndToEndTest {
         String handleSave = TYPE_PROJECT + "::src/page.ts::handleSave()";
 
         assertThat(repository.findOutgoingRelationships(
-                TYPE_PROJECT, userService, "TS_EXTENDS"))
+                TYPE_PROJECT, userService, "EXTENDS"))
             .extracting(relationship -> relationship.getToNodeId())
             .containsExactly(baseService);
         assertThat(repository.findOutgoingRelationships(
-                TYPE_PROJECT, userService, "TS_IMPLEMENTS"))
+                TYPE_PROJECT, userService, "IMPLEMENTS"))
             .extracting(relationship -> relationship.getToNodeId())
             .containsExactly(apiClient)
             .doesNotContain(wrongApiClient);
         assertThat(repository.findOutgoingRelationships(
-                TYPE_PROJECT, save, "TS_OVERRIDES"))
+                TYPE_PROJECT, save, "OVERRIDES"))
             .extracting(relationship -> relationship.getToNodeId())
             .containsExactly(interfaceSave);
         assertThat(repository.findOutgoingRelationships(
@@ -205,14 +205,14 @@ class FrontendProcessParserEndToEndTest {
             String interfaceSave = TYPE_PROJECT + "::src/contracts.ts::ApiClient.save()";
             String handleSave = TYPE_PROJECT + "::src/page.ts::handleSave()";
 
-            assertThat(relationships.findOutgoingRelationships(TYPE_PROJECT, userService, "TS_EXTENDS"))
+            assertThat(relationships.findOutgoingRelationships(TYPE_PROJECT, userService, "EXTENDS"))
                 .extracting(relationship -> relationship.getToNodeId())
                 .containsExactly(baseService);
-            assertThat(relationships.findOutgoingRelationships(TYPE_PROJECT, userService, "TS_IMPLEMENTS"))
+            assertThat(relationships.findOutgoingRelationships(TYPE_PROJECT, userService, "IMPLEMENTS"))
                 .extracting(relationship -> relationship.getToNodeId())
                 .containsExactly(apiClient)
                 .doesNotContain(wrongApiClient);
-            assertThat(relationships.findOutgoingRelationships(TYPE_PROJECT, save, "TS_OVERRIDES"))
+            assertThat(relationships.findOutgoingRelationships(TYPE_PROJECT, save, "OVERRIDES"))
                 .extracting(relationship -> relationship.getToNodeId())
                 .containsExactly(interfaceSave);
             assertThat(relationships.findOutgoingRelationships(

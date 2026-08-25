@@ -34,13 +34,6 @@ public class CodeRelationship {
      */
     private RelationshipType relationshipType;
 
-    /**
-     * Language-neutral behavior used by Engine services. For declared shared
-     * types this defaults from {@link #relationshipType}; language-specific
-     * types must provide it in GraphDelta.
-     */
-    private RelationshipKind relationshipKind;
-
     /** Parser-declared endpoint node contracts (Neo4j labels). */
     private String fromNodeType;
     private String toNodeType;
@@ -65,13 +58,6 @@ public class CodeRelationship {
      */
     private String projectName;
 
-    public RelationshipKind getRelationshipKind() {
-        if (relationshipKind != null) {
-            return relationshipKind;
-        }
-        return relationshipType == null ? null : relationshipType.getDefaultKind();
-    }
-
     public String getFromNodeType() {
         if (fromNodeType != null && !fromNodeType.isBlank()) {
             return fromNodeType;
@@ -86,7 +72,4 @@ public class CodeRelationship {
         return relationshipType == null ? null : relationshipType.getToLabel();
     }
 
-    public boolean hasKind(RelationshipKind kind) {
-        return kind != null && kind == getRelationshipKind();
-    }
 }

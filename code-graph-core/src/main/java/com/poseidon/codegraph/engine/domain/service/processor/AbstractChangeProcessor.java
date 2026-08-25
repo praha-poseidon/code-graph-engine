@@ -106,9 +106,9 @@ public abstract class AbstractChangeProcessor implements CodeChangeProcessor {
         }
         
         java.util.List<CodeRelationship> relationships = safeList(delta.relationships());
-        // Process every language-owned call edge through the shared CALL behavior.
+        // CALLS is a shared relationship; language-specific structural edges are opaque to Engine.
         java.util.List<CodeRelationship> callRelationships = relationships.stream()
-            .filter(rel -> rel.hasKind(RelationshipKind.CALL))
+            .filter(rel -> RelationshipType.CALLS.equals(rel.getRelationshipType()))
             .collect(java.util.stream.Collectors.toList());
         
         if (callRelationships.isEmpty()) {

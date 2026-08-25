@@ -83,9 +83,6 @@ public class CodeGraphConverter {
         if (dobj.getRelationshipType() != null) {
             domain.setRelationshipType(RelationshipType.valueOf(dobj.getRelationshipType()));
         }
-        if (dobj.getRelationshipKind() != null) {
-            domain.setRelationshipKind(RelationshipKind.valueOf(dobj.getRelationshipKind()));
-        }
         domain.setFromNodeType(dobj.getFromNodeType());
         domain.setToNodeType(dobj.getToNodeType());
         
@@ -241,9 +238,6 @@ public class CodeGraphConverter {
         // 关系类型
         if (domain.getRelationshipType() != null) {
             dobj.setRelationshipType(domain.getRelationshipType().name());
-        }
-        if (domain.getRelationshipKind() != null) {
-            dobj.setRelationshipKind(domain.getRelationshipKind().name());
         }
         dobj.setFromNodeType(domain.getFromNodeType());
         dobj.setToNodeType(domain.getToNodeType());

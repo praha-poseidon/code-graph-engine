@@ -8,7 +8,6 @@ import com.poseidon.codegraph.model.CodeRelationship;
 import com.poseidon.codegraph.model.CodeUnit;
 import com.poseidon.codegraph.model.GraphIds;
 import com.poseidon.codegraph.model.RelationshipType;
-import com.poseidon.codegraph.model.RelationshipKind;
 import com.poseidon.codegraph.model.delta.GraphDelta;
 import com.poseidon.codegraph.model.endpoint.HttpEndpoint;
 import com.poseidon.codegraph.model.event.NodeChangeEvent;
@@ -236,9 +235,9 @@ class GraphDeltaApplyServiceTest {
         context.setProjectName("demo");
         List<CodeRelationship> insertedRelationships = new ArrayList<>();
 
-        CodeRelationship extendsRelationship = languageRelationship("fn.Child", "fn.Base", "JAVA_EXTENDS", RelationshipKind.SPECIALIZES, "CodeUnit", "CodeUnit");
-        CodeRelationship implementsRelationship = languageRelationship("fn.Child", "fn.Api", "JAVA_IMPLEMENTS", RelationshipKind.CONFORMS, "CodeUnit", "CodeUnit");
-        CodeRelationship overridesRelationship = languageRelationship("fn.Child.get()", "fn.Base.get()", "JAVA_OVERRIDES", RelationshipKind.REFINES, "CodeFunction", "CodeFunction");
+        CodeRelationship extendsRelationship = languageRelationship("fn.Child", "fn.Base", "EXTENDS", "CodeUnit", "CodeUnit");
+        CodeRelationship implementsRelationship = languageRelationship("fn.Child", "fn.Api", "IMPLEMENTS", "CodeUnit", "CodeUnit");
+        CodeRelationship overridesRelationship = languageRelationship("fn.Child.get()", "fn.Base.get()", "OVERRIDES", "CodeFunction", "CodeFunction");
         CodeRelationship callRelationship = relationship("fn.Child.get()", "fn.Helper.run()", RelationshipType.CALLS);
 
         context.getReader().setFindExistingStructureRelationships(rels -> java.util.Set.of());
@@ -260,9 +259,9 @@ class GraphDeltaApplyServiceTest {
         assertThat(insertedRelationships)
             .extracting(CodeRelationship::getRelationshipType)
             .containsExactlyInAnyOrder(
-                RelationshipType.of("JAVA_EXTENDS"),
-                RelationshipType.of("JAVA_IMPLEMENTS"),
-                RelationshipType.of("JAVA_OVERRIDES"),
+                RelationshipType.of("EXTENDS"),
+                RelationshipType.of("IMPLEMENTS"),
+                RelationshipType.of("OVERRIDES"),
                 RelationshipType.CALLS);
     }
 
@@ -427,9 +426,8 @@ class GraphDeltaApplyServiceTest {
     }
 
     private CodeRelationship languageRelationship(String from, String to, String type,
-                                                  RelationshipKind kind, String fromNodeType, String toNodeType) {
+                                                  String fromNodeType, String toNodeType) {
         CodeRelationship relationship = relationship(from, to, RelationshipType.of(type));
-        relationship.setRelationshipKind(kind);
         relationship.setFromNodeType(fromNodeType);
         relationship.setToNodeType(toNodeType);
         return relationship;

@@ -25,9 +25,6 @@ public class CodeRelationshipDO {
      */
     private String relationshipType;
 
-    /** Engine-level behavior, independent of the language-owned edge name. */
-    private String relationshipKind;
-
     /** Endpoint node labels supplied by the parser relationship contract. */
     private String fromNodeType;
     private String toNodeType;

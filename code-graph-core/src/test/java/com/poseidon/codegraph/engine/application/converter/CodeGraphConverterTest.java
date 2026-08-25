@@ -12,7 +12,6 @@ import com.poseidon.codegraph.model.CodeRelationship;
 import com.poseidon.codegraph.model.CodeUnit;
 import com.poseidon.codegraph.model.EndpointType;
 import com.poseidon.codegraph.model.RelationshipType;
-import com.poseidon.codegraph.model.RelationshipKind;
 import com.poseidon.codegraph.model.endpoint.DbEndpoint;
 import com.poseidon.codegraph.model.endpoint.HttpEndpoint;
 import com.poseidon.codegraph.model.endpoint.MqEndpoint;
@@ -89,8 +88,7 @@ class CodeGraphConverterTest {
         relationship.setId("rel:1");
         relationship.setFromNodeId(function.getId());
         relationship.setToNodeId("fn:Target.call()");
-        relationship.setRelationshipType(RelationshipType.of("GO_METHOD_SATISFIES"));
-        relationship.setRelationshipKind(RelationshipKind.REFINES);
+        relationship.setRelationshipType(RelationshipType.of("SATISFIES_METHOD"));
         relationship.setFromNodeType("CodeFunction");
         relationship.setToNodeType("CodeFunction");
         relationship.setLineNumber(5);
@@ -99,13 +97,11 @@ class CodeGraphConverterTest {
         relationship.setProjectName("app");
 
         CodeRelationshipDO relationshipDO = CodeGraphConverter.toDO(relationship);
-        assertEquals("GO_METHOD_SATISFIES", relationshipDO.getRelationshipType());
-        assertEquals("REFINES", relationshipDO.getRelationshipKind());
+        assertEquals("SATISFIES_METHOD", relationshipDO.getRelationshipType());
         assertEquals("CodeFunction", relationshipDO.getFromNodeType());
         assertEquals("CodeFunction", relationshipDO.getToNodeType());
         CodeRelationship roundTrippedRelationship = CodeGraphConverter.toDomain(relationshipDO);
-        assertEquals(RelationshipType.of("GO_METHOD_SATISFIES"), roundTrippedRelationship.getRelationshipType());
-        assertEquals(RelationshipKind.REFINES, roundTrippedRelationship.getRelationshipKind());
+        assertEquals(RelationshipType.of("SATISFIES_METHOD"), roundTrippedRelationship.getRelationshipType());
         assertEquals("CodeFunction", roundTrippedRelationship.getFromNodeType());
         assertEquals("CodeFunction", roundTrippedRelationship.getToNodeType());
     }

@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  * Extensible graph relationship name.
  *
  * <p>Unlike an enum, this value accepts language-owned names such as
- * {@code GO_SATISFIES} or {@code PHP_USES_TRAIT}. Only genuinely shared edge
+ * {@code SATISFIES} or {@code USES_TRAIT}. Only genuinely shared edge
  * names live here. Language adapters own their native relationship vocabulary.</p>
  */
 public final class RelationshipType {
@@ -21,22 +21,14 @@ public final class RelationshipType {
     private static final Pattern SAFE_NAME = Pattern.compile("[A-Z][A-Z0-9_]*");
     private static final Map<String, RelationshipType> INTERNED = new ConcurrentHashMap<>();
 
-    public static final RelationshipType CALLS = declared(
-        "CALLS", RelationshipKind.CALL, "CodeFunction", "CodeFunction");
-    public static final RelationshipType RENDERS = declared(
-        "RENDERS", RelationshipKind.RENDERS, "CodeFunction", "CodeFunction");
-    public static final RelationshipType PACKAGE_TO_UNIT = declared(
-        "PACKAGE_TO_UNIT", RelationshipKind.CONTAINS, "CodePackage", "CodeUnit");
-    public static final RelationshipType PACKAGE_TO_PACKAGE = declared(
-        "PACKAGE_TO_PACKAGE", RelationshipKind.CONTAINS, "CodePackage", "CodePackage");
-    public static final RelationshipType UNIT_TO_FUNCTION = declared(
-        "UNIT_TO_FUNCTION", RelationshipKind.CONTAINS, "CodeUnit", "CodeFunction");
-    public static final RelationshipType ENDPOINT_TO_FUNCTION = declared(
-        "ENDPOINT_TO_FUNCTION", RelationshipKind.BINDS_ENDPOINT, "CodeEndpoint", "CodeFunction");
-    public static final RelationshipType FUNCTION_TO_ENDPOINT = declared(
-        "FUNCTION_TO_ENDPOINT", RelationshipKind.BINDS_ENDPOINT, "CodeFunction", "CodeEndpoint");
-    public static final RelationshipType MATCHES = declared(
-        "MATCHES", RelationshipKind.MATCHES_ENDPOINT, "CodeEndpoint", "CodeEndpoint");
+    public static final RelationshipType CALLS = declared("CALLS", "CodeFunction", "CodeFunction");
+    public static final RelationshipType RENDERS = declared("RENDERS", "CodeFunction", "CodeFunction");
+    public static final RelationshipType PACKAGE_TO_UNIT = declared("PACKAGE_TO_UNIT", "CodePackage", "CodeUnit");
+    public static final RelationshipType PACKAGE_TO_PACKAGE = declared("PACKAGE_TO_PACKAGE", "CodePackage", "CodePackage");
+    public static final RelationshipType UNIT_TO_FUNCTION = declared("UNIT_TO_FUNCTION", "CodeUnit", "CodeFunction");
+    public static final RelationshipType ENDPOINT_TO_FUNCTION = declared("ENDPOINT_TO_FUNCTION", "CodeEndpoint", "CodeFunction");
+    public static final RelationshipType FUNCTION_TO_ENDPOINT = declared("FUNCTION_TO_ENDPOINT", "CodeFunction", "CodeEndpoint");
+    public static final RelationshipType MATCHES = declared("MATCHES", "CodeEndpoint", "CodeEndpoint");
 
     private static final List<RelationshipType> DECLARED_TYPES = List.of(
         CALLS,
@@ -50,29 +42,25 @@ public final class RelationshipType {
     );
 
     private final String name;
-    private final RelationshipKind defaultKind;
     private final String defaultFromNodeType;
     private final String defaultToNodeType;
 
-    private RelationshipType(String name, RelationshipKind defaultKind,
-                             String defaultFromNodeType, String defaultToNodeType) {
+    private RelationshipType(String name, String defaultFromNodeType, String defaultToNodeType) {
         this.name = name;
-        this.defaultKind = defaultKind;
         this.defaultFromNodeType = defaultFromNodeType;
         this.defaultToNodeType = defaultToNodeType;
     }
 
-    private static RelationshipType declared(String name, RelationshipKind kind,
-                                             String fromNodeType, String toNodeType) {
+    private static RelationshipType declared(String name, String fromNodeType, String toNodeType) {
         validateName(name);
-        RelationshipType type = new RelationshipType(name, kind, fromNodeType, toNodeType);
+        RelationshipType type = new RelationshipType(name, fromNodeType, toNodeType);
         RelationshipType previous = INTERNED.putIfAbsent(name, type);
         return previous == null ? type : previous;
     }
 
     /**
      * Resolves any safe relationship name. Unknown names intentionally have no
-     * Engine metadata; their parser must send kind and endpoint node types.
+     * Engine metadata; their parser must send endpoint node types.
      */
     @JsonCreator
     public static RelationshipType valueOf(String name) {
@@ -82,7 +70,7 @@ public final class RelationshipType {
         String normalized = name.trim().toUpperCase();
         validateName(normalized);
         return INTERNED.computeIfAbsent(normalized,
-            key -> new RelationshipType(key, null, null, null));
+            key -> new RelationshipType(key, null, null));
     }
 
     public static RelationshipType of(String name) {
@@ -97,10 +85,6 @@ public final class RelationshipType {
     @JsonValue
     public String name() {
         return name;
-    }
-
-    public RelationshipKind getDefaultKind() {
-        return defaultKind;
     }
 
     public String getFromLabel() {

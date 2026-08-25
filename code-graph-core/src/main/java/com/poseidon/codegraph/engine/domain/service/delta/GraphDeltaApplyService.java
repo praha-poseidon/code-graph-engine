@@ -12,7 +12,6 @@ import com.poseidon.codegraph.model.CodeRelationship;
 import com.poseidon.codegraph.model.CodeUnit;
 import com.poseidon.codegraph.model.GraphIds;
 import com.poseidon.codegraph.model.RelationshipType;
-import com.poseidon.codegraph.model.RelationshipKind;
 import com.poseidon.codegraph.model.delta.Diagnostic;
 import com.poseidon.codegraph.model.delta.DiagnosticLevel;
 import com.poseidon.codegraph.model.delta.GraphDelta;
@@ -80,8 +79,8 @@ public class GraphDeltaApplyService {
         // All non-call, non-generated-match relationships are persisted generically.
         // Their exact language-owned names are deliberately opaque to Engine.
         List<CodeRelationship> structureRelationships = safeList(delta.relationships()).stream()
-            .filter(rel -> !rel.hasKind(RelationshipKind.CALL)
-                && !rel.hasKind(RelationshipKind.MATCHES_ENDPOINT))
+            .filter(rel -> !RelationshipType.CALLS.equals(rel.getRelationshipType())
+                && !RelationshipType.MATCHES.equals(rel.getRelationshipType()))
             .collect(Collectors.toList());
 
         if (!structureRelationships.isEmpty()) {
@@ -92,7 +91,7 @@ public class GraphDeltaApplyService {
         // Frontend / external GraphDelta import never goes through that path, so CALLS
         // from the delta must be persisted here as well.
         List<CodeRelationship> callRelationships = safeList(delta.relationships()).stream()
-            .filter(rel -> rel.hasKind(RelationshipKind.CALL))
+            .filter(rel -> RelationshipType.CALLS.equals(rel.getRelationshipType()))
             .collect(Collectors.toList());
         if (!callRelationships.isEmpty()) {
             saveCallRelationshipsWithCheck(callRelationships, context);

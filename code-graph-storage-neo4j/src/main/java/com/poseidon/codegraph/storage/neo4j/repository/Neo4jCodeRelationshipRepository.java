@@ -34,11 +34,9 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
     public List<String> findWhoCallsMe(String projectName, String targetProjectFilePath) {
         log.debug("查询依赖文件: targetFile={}", targetProjectFilePath);
         String cypher = """
-            MATCH (caller:CodeFunction)-[r]->(callee:CodeFunction)
+            MATCH (caller:CodeFunction)-[:CALLS]->(callee:CodeFunction)
             WHERE callee.projectName = $projectName
               AND caller.projectName = $projectName
-              AND r.projectName = $projectName
-              AND r.relationshipKind = 'CALL'
               AND callee.projectFilePath = $targetProjectFilePath
             RETURN DISTINCT caller.projectFilePath AS projectFilePath
             """;
@@ -61,11 +59,9 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
     public List<FileMetaInfo> findWhoCallsMeWithMeta(String projectName, String targetProjectFilePath) {
         log.debug("查询依赖文件（带 Git 元信息）: targetFile={}", targetProjectFilePath);
         String cypher = """
-            MATCH (caller:CodeFunction)-[r]->(callee:CodeFunction)
+            MATCH (caller:CodeFunction)-[:CALLS]->(callee:CodeFunction)
             WHERE callee.projectName = $projectName
               AND caller.projectName = $projectName
-              AND r.projectName = $projectName
-              AND r.relationshipKind = 'CALL'
               AND callee.projectFilePath = $targetProjectFilePath
             RETURN DISTINCT 
                 caller.projectFilePath AS projectFilePath,
@@ -99,10 +95,8 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
     public void deleteFileOutgoingCalls(String projectName, String projectFilePath) {
         log.debug("删除文件出边: file={}", projectFilePath);
         String cypher = """
-            MATCH (caller:CodeFunction)-[r]->()
+            MATCH (caller:CodeFunction)-[r:CALLS]->()
             WHERE caller.projectName = $projectName
-              AND r.projectName = $projectName
-              AND r.relationshipKind = 'CALL'
               AND caller.projectFilePath = $projectFilePath
             DELETE r
             """;
@@ -213,7 +207,6 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
                 r.fromNodeId = rel.fromNodeId,
                 r.toNodeId = rel.toNodeId,
                 r.relationshipType = rel.relationshipType,
-                r.relationshipKind = rel.relationshipKind,
                 r.fromNodeType = rel.fromNodeType,
                 r.toNodeType = rel.toNodeType,
                 r.lineNumber = rel.lineNumber,
@@ -232,7 +225,6 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
         map.put("fromNodeId", relationship.getFromNodeId());
         map.put("toNodeId", relationship.getToNodeId());
         map.put("relationshipType", relationship.getRelationshipType());
-        map.put("relationshipKind", relationship.getRelationshipKind());
         map.put("fromNodeType", relationship.getFromNodeType());
         map.put("toNodeType", relationship.getToNodeType());
         map.put("lineNumber", relationship.getLineNumber());
@@ -286,7 +278,6 @@ public class Neo4jCodeRelationshipRepository implements CodeRelationshipReposito
         relationship.setFromNodeId((String) map.get("fromNodeId"));
         relationship.setToNodeId((String) map.get("toNodeId"));
         relationship.setRelationshipType((String) map.get("relationshipType"));
-        relationship.setRelationshipKind((String) map.get("relationshipKind"));
         relationship.setFromNodeType((String) map.get("fromNodeType"));
         relationship.setToNodeType((String) map.get("toNodeType"));
         relationship.setLineNumber(map.get("lineNumber") instanceof Number number ? number.intValue() : null);

@@ -6,7 +6,6 @@ import com.poseidon.codegraph.model.CodeNode;
 import com.poseidon.codegraph.model.CodePackage;
 import com.poseidon.codegraph.model.CodeRelationship;
 import com.poseidon.codegraph.model.CodeUnit;
-import com.poseidon.codegraph.model.RelationshipKind;
 import com.poseidon.codegraph.model.RelationshipType;
 
 import java.util.ArrayList;
@@ -145,12 +144,6 @@ public class GraphDeltaValidator {
             if (type == null) {
                 diagnostics.add(error("relationship.type.required", "relationship relationshipType must not be null", null, relationship.getLineNumber()));
                 continue;
-            }
-            RelationshipKind kind = relationship.getRelationshipKind();
-            if (kind == null) {
-                diagnostics.add(error("relationship.kind.required",
-                    "language-specific relationship must declare relationshipKind: " + type,
-                    null, relationship.getLineNumber()));
             }
             String fromNodeType = relationship.getFromNodeType();
             String toNodeType = relationship.getToNodeType();
