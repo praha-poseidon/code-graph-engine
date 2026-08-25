@@ -1,5 +1,16 @@
 # Code Graph Engine
 
+## Self-contained parser-java CLI release
+
+Tags named `parser-java-v*` publish `parser-java-<tag>-linux-x64.tar.gz` with the JDT parser fat jar and Java runtime.
+
+```bash
+tar -xzf parser-java-*-linux-x64.tar.gz
+cd parser-java-*-linux-x64
+./install.sh
+parser-java --help
+```
+
 Code Graph Engine is a pluggable code graph engine for turning source code into queryable graph data. It focuses on project-scale static analysis, incremental updates, endpoint extraction, and replaceable graph storage.
 
 Code Graph 是一个可插拔的代码图谱引擎，用来把源码转换成可查询、可存储、可增量更新的图数据。它重点解决项目级静态分析、增量更新、端点提取和图数据库适配问题。
