@@ -30,10 +30,15 @@ inheritance, interface satisfaction, overriding, embedding, or shadowing.
 | Python | `INHERITS`, `CONFORMS`, `OVERRIDES` |
 | PHP | `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`, `USES_TRAIT` |
 | Kotlin | `INHERITS`, `IMPLEMENTS`, `OVERRIDES` |
+| Swift | `INHERITS`, `CONFORMS`, `REFINES`, `OVERRIDES`, `WITNESSES` |
 
 Go does not have inheritance or overriding. `SATISFIES_METHOD` connects a
 concrete method to an interface method it satisfies; `SHADOWS` records an outer
 method hiding a promoted method from an embedded type.
+
+Swift keeps protocol conformance separate from class inheritance. `WITNESSES`
+connects a concrete method to the protocol requirement it satisfies, including
+requirements inherited through protocol refinement.
 
 ## Adding a relationship
 

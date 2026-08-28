@@ -20,5 +20,6 @@ class IncrementalUpdateServiceLanguageTest {
         assertEquals("typescript", IncrementalUpdateService.inferLanguage("src/app.tsx"));
         assertEquals("kotlin", IncrementalUpdateService.inferLanguage("src/App.kt"));
         assertEquals("kotlin", IncrementalUpdateService.inferLanguage("build.gradle.kts"));
+        assertEquals("swift", IncrementalUpdateService.inferLanguage("Sources/App/Service.swift"));
     }
 }

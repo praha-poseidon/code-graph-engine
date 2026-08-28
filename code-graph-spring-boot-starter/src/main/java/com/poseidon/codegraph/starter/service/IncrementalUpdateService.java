@@ -524,6 +524,9 @@ public class IncrementalUpdateService {
         if (path.endsWith(".kt") || path.endsWith(".kts")) {
             return "kotlin";
         }
+        if (path.endsWith(".swift")) {
+            return "swift";
+        }
         if (path.endsWith(".js") || path.endsWith(".jsx")) {
             return "javascript";
         }

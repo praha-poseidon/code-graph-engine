@@ -57,6 +57,16 @@ PHP 解析器可以这样接入：
 -Dcodegraph.parser.process.php.command="/path/to/parser-php --stdio"
 ```
 
+For the Swift parser, keep one task-local process so unchanged Swift ASTs can be reused:
+
+Swift 解析器建议在一次任务内复用进程，以复用未变化文件的 Swift AST：
+
+```bash
+-Dcodegraph.parser.process.languages=swift
+-Dcodegraph.parser.process.swift.command="/path/to/parser-swift --stdio-stream"
+-Dcodegraph.parser.process.swift.streaming=true
+```
+
 The same configuration can be supplied with environment variables:
 
 也可以通过环境变量配置：
@@ -76,6 +86,14 @@ PHP 环境变量示例：
 ```bash
 CODEGRAPH_PARSER_PROCESS_LANGUAGES=php
 CODEGRAPH_PARSER_PHP_COMMAND="/path/to/parser-php --stdio"
+```
+
+Swift environment-variable example:
+
+```bash
+CODEGRAPH_PARSER_PROCESS_LANGUAGES=swift
+CODEGRAPH_PARSER_SWIFT_COMMAND="/path/to/parser-swift --stdio-stream"
+CODEGRAPH_PARSER_SWIFT_STREAMING=true
 ```
 
 Python parser example:
