@@ -1,0 +1,7 @@
+.git
+.idea
+**/target
+**/node_modules
+**/.DS_Store
+docs/design
+data

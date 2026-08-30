@@ -1,27 +1,22 @@
-import { useRef, useState } from 'react'
-import { Bot, ChevronDown, CircleHelp, FileUp, Keyboard, Loader2, Network, Search, Settings } from 'lucide-react'
+import { useState } from 'react'
+import { Bot, ChevronDown, CircleHelp, Keyboard, Loader2, Search, Settings } from 'lucide-react'
 import { nodeDisplayName } from '../../../api/graphMapper'
 import type { WorkbenchController } from '../state/useWorkbenchState'
 import { repoDisplayName } from '../workbench-constants'
 
 export default function WorkbenchHeader({ controller }: { controller: WorkbenchController }) {
   const [repoOpen, setRepoOpen] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const selectedRepoLabel = controller.selectedGitRepoUrl ? repoDisplayName(controller.selectedGitRepoUrl) : 'All repositories'
 
   return (
     <header className="relative z-40 flex h-16 shrink-0 items-center gap-4 border-b border-dashed border-violet-500/20 bg-[#090910] px-5">
-      <div className="flex w-[370px] shrink-0 items-center gap-4">
-        <div className="flex items-center gap-2 text-white">
-          <Network className="h-[22px] w-[22px] text-violet-300 drop-shadow-[0_0_12px_rgba(139,92,246,0.4)]" strokeWidth={2} />
-          <div className="text-lg font-bold tracking-tight">code-graph-engine</div>
-        </div>
-        <div className="relative max-w-[176px]">
+      <div className="flex w-[260px] shrink-0 items-center">
+        <div className="relative w-full">
           <button
             type="button"
             title={controller.selectedGitRepoUrl || undefined}
             onClick={() => setRepoOpen(open => !open)}
-            className="flex h-9 w-[176px] items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.025] px-3 text-left text-xs text-[#9d97b6] transition hover:border-violet-400/30 hover:text-white"
+            className="flex h-10 w-full items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.025] px-3 text-left text-xs text-[#9d97b6] transition hover:border-violet-400/30 hover:text-white"
           >
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
             <span className="min-w-0 flex-1 truncate">{selectedRepoLabel}</span>
@@ -114,26 +109,6 @@ export default function WorkbenchHeader({ controller }: { controller: WorkbenchC
           <span>{controller.graphData.nodes.length} nodes</span>
           <span>{controller.graphData.edges.length} edges</span>
         </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json,application/json"
-          className="hidden"
-          onChange={async event => {
-            const file = event.target.files?.[0]
-            event.target.value = ''
-            if (file) await controller.importGraphDeltaFile(file)
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={controller.importingDelta}
-          className="flex h-10 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-violet-200 transition hover:border-violet-400/40 hover:bg-violet-600/15 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {controller.importingDelta ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-          Import JSON
-        </button>
         <button
           onClick={() => controller.setMode('settings')}
           title="配置中心"

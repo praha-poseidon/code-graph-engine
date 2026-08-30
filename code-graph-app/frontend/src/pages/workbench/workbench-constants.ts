@@ -2,19 +2,13 @@ import type { ElementType } from 'react'
 import { Box, Braces, Code2, Folder } from 'lucide-react'
 
 export type WorkbenchMode = 'graph' | 'settings'
-export type SettingsTab = 'projects' | 'ssh-keys' | 'endpoint-rules'
+export type SettingsTab = 'projects'
 
 export interface GraphMetadata {
   gitRepoUrls: string[]
   nodeTypes: string[]
   relationshipTypes: string[]
 }
-
-export const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
-  { id: 'projects', label: '仓库管理' },
-  { id: 'ssh-keys', label: 'SSH 密钥' },
-  { id: 'endpoint-rules', label: '端点规则' },
-]
 
 export const NODE_FILTER_META: Record<string, { label: string; color: string; icon: ElementType }> = {
   CodePackage: { label: 'Package', color: '#8b5cf6', icon: Folder },

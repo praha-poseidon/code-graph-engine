@@ -35,4 +35,5 @@ test-data/
 # Application
 application-local.yml
 application-dev.yml
-
+data/
+parsers/

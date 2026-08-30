@@ -4,10 +4,26 @@ server:
 spring:
   application:
     name: code-graph-app
+  datasource:
+    url: ${CODEGRAPH_DATABASE_URL:jdbc:h2:file:./data/codegraph;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE}
+    username: ${CODEGRAPH_DATABASE_USERNAME:sa}
+    password: ${CODEGRAPH_DATABASE_PASSWORD:}
+    driver-class-name: ${CODEGRAPH_DATABASE_DRIVER:org.h2.Driver}
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
 
 code-graph:
   storage:
-    type: memory
+    type: ${CODEGRAPH_STORAGE_TYPE:memory}
+  workspace-root: ${CODEGRAPH_WORKSPACE_ROOT:${java.io.tmpdir}/codegraph-workspaces}
+  security:
+    master-key: ${CODEGRAPH_MASTER_KEY:}
+  tasks:
+    enabled: ${CODEGRAPH_TASKS_ENABLED:true}
+    poll-delay-ms: ${CODEGRAPH_TASK_POLL_DELAY_MS:1000}
+    auto-build: ${CODEGRAPH_AUTO_BUILD:true}
 
 logging:
   level:
