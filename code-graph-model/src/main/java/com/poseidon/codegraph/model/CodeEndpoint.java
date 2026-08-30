@@ -2,6 +2,7 @@ package com.poseidon.codegraph.model;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.poseidon.codegraph.model.endpoint.DbEndpoint;
 import com.poseidon.codegraph.model.endpoint.HttpEndpoint;
 import com.poseidon.codegraph.model.endpoint.MqEndpoint;
@@ -81,10 +82,12 @@ public abstract class CodeEndpoint extends CodeNode {
     /**
      * 获取关联的函数 ID
      */
+    @JsonIgnore
     public String getFunctionId() {
         return function != null ? function.getId() : null;
     }
 
+    @JsonIgnore
     public String getNodeType() {
         return "CodeEndpoint";
     }

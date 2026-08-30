@@ -4,6 +4,7 @@ import com.poseidon.codegraph.engine.application.model.CodeFunctionDO;
 import com.poseidon.codegraph.engine.application.model.CodeRelationshipDO;
 import com.poseidon.codegraph.engine.application.model.CodeUnitDO;
 import com.poseidon.codegraph.storage.memory.repository.InMemoryCodeGraphRepository;
+import com.poseidon.codegraph.spi.CodeGraphParserRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -39,7 +40,8 @@ class IncrementalUpdateServiceMemoryIntegrationTest {
             repository,
             repository,
             repository,
-            repository);
+            repository,
+            new CodeGraphParserRegistry(List.of(new TestCodeGraphParser())));
 
         service.handleFileAdded(
             "demo",

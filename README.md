@@ -1,16 +1,5 @@
 # Code Graph Engine
 
-## Self-contained parser-java CLI release
-
-Tags named `parser-java-v*` publish `parser-java-<tag>-linux-x64.tar.gz` with the JDT parser fat jar and Java runtime.
-
-```bash
-tar -xzf parser-java-*-linux-x64.tar.gz
-cd parser-java-*-linux-x64
-./install.sh
-parser-java --help
-```
-
 Code Graph Engine is a pluggable code graph engine for turning source code into queryable graph data. It focuses on project-scale static analysis, incremental updates, endpoint extraction, and replaceable graph storage.
 
 Code Graph 是一个可插拔的代码图谱引擎，用来把源码转换成可查询、可存储、可增量更新的图数据。它重点解决项目级静态分析、增量更新、端点提取和图数据库适配问题。
@@ -49,7 +38,7 @@ Code Graph 提供的是这套基础引擎，而不是一个封闭应用。
 
 ## Current Capabilities
 
-- Java parsing based on Eclipse JDT.
+- External Java parsing through the independently released `code-graph-parser-java` CLI.
 - Package, class, interface, enum, annotation, and method nodes.
 - Call relationships.
 - Inheritance, implementation, and override relationships.
@@ -68,7 +57,6 @@ Code Graph 提供的是这套基础引擎，而不是一个封闭应用。
 | --- | --- |
 | `code-graph-model` | Common graph model, endpoint model, delta model, and ID helpers. |
 | `code-graph-spi` | Parser extension interfaces and ServiceLoader registry. |
-| `code-graph-parser-java-jdt` | Java parser based on Eclipse JDT, including endpoint extraction through SER rules. |
 | `code-graph-parser-process` | Adapter for external parsers running as local processes. |
 | `code-graph-core` | Domain logic for graph merge, incremental update, placeholder handling, and cascade changes. |
 | `code-graph-storage-memory` | In-memory repository implementation for tests and local demos. |
@@ -84,6 +72,7 @@ Requirements:
 
 - JDK 21
 - Maven 3.9+
+- The standalone `parser-java` command when Java source is processed
 
 Clone and test:
 
@@ -91,6 +80,13 @@ Clone and test:
 git clone https://github.com/praha-poseidon/code-graph-engine.git
 cd code-graph-engine
 mvn test
+```
+
+Configure the independently installed Java parser before starting the Engine:
+
+```bash
+export CODEGRAPH_PARSER_PROCESS_LANGUAGES=java
+export CODEGRAPH_PARSER_PROCESS_JAVA_COMMAND="parser-java --stdio-stream"
 ```
 
 Start the demo app with memory storage:

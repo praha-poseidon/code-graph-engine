@@ -7,6 +7,7 @@ import com.poseidon.codegraph.engine.application.model.CodeRelationshipDO;
 import com.poseidon.codegraph.engine.application.model.CodeUnitDO;
 import com.poseidon.codegraph.storage.memory.repository.InMemoryCodeGraphRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -48,6 +49,7 @@ class CodeGraphAppEndToEndTest {
     Path tempDir;
 
     @Test
+    @EnabledIfEnvironmentVariable(named = "CODEGRAPH_PARSER_JAVA_COMMAND", matches = ".+")
     void apiCreateUpdateAndDeleteWritesExpectedGraphToMemoryStorage() throws Exception {
         Path sourceRoot = tempDir.resolve("src/main/java");
         Path sourceFile = sourceRoot.resolve("com/example/ApiController.java");
@@ -91,6 +93,7 @@ class CodeGraphAppEndToEndTest {
     }
 
     @Test
+    @EnabledIfEnvironmentVariable(named = "CODEGRAPH_PARSER_JAVA_COMMAND", matches = ".+")
     void apiReturnsClearErrorWhenExternalEndpointSerIsInvalid() throws Exception {
         Path sourceRoot = tempDir.resolve("src/main/java");
         Path sourceFile = sourceRoot.resolve("com/example/ApiController.java");

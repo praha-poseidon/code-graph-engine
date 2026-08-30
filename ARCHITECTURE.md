@@ -10,14 +10,10 @@ code-graph-app
       -> code-graph-core
       -> code-graph-spi
       -> storage modules
-      -> parser modules through ServiceLoader
+      -> external parser processes through code-graph-parser-process
 
 code-graph-core
   -> code-graph-model
-
-code-graph-parser-java-jdt
-  -> code-graph-model
-  -> code-graph-spi
 
 code-graph-storage-*
   -> code-graph-core repository interfaces
@@ -44,7 +40,7 @@ The engine does not depend on Neo4j, Memgraph, Apache AGE, Spring MVC controller
 
 A parser receives a `ParseRequest` and returns a `GraphDelta`.
 
-The Java parser uses Eclipse JDT. Other languages should not reuse Java internals. They should either:
+Language parsers, including the standalone Java/JDT parser, are separate projects. They should either:
 
 - implement `CodeGraphParser` directly, or
 - run as an external process through `code-graph-parser-process`.

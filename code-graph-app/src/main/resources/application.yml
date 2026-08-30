@@ -11,5 +11,4 @@ code-graph:
 
 logging:
   level:
-    com.poseidon.codegraph.parser.javajdt: DEBUG
     com.poseidon.codegraph.engine.domain.service.processor: DEBUG

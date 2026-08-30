@@ -8,6 +8,7 @@ import com.poseidon.codegraph.engine.application.repository.CodeFunctionReposito
 import com.poseidon.codegraph.engine.application.repository.CodePackageRepository;
 import com.poseidon.codegraph.engine.application.repository.CodeRelationshipRepository;
 import com.poseidon.codegraph.engine.application.repository.CodeUnitRepository;
+import com.poseidon.codegraph.spi.CodeGraphParserRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -51,7 +52,8 @@ class IncrementalUpdateServiceTest {
             unitRepository,
             functionRepository,
             relationshipRepository,
-            endpointRepository);
+            endpointRepository,
+            new CodeGraphParserRegistry(List.of(new TestCodeGraphParser())));
 
         lenient().when(packageRepository.findExistingPackagesByQualifiedNames(any(), any())).thenReturn(Set.of());
         lenient().when(unitRepository.findExistingUnitsByQualifiedNames(any(), any())).thenReturn(Set.of());

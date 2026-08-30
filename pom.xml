@@ -29,7 +29,6 @@
     <module>code-graph-model</module>
     <module>code-graph-spi</module>
     <module>code-graph-parser-process</module>
-    <module>code-graph-parser-java-jdt</module>
     <module>code-graph-core</module>
     <module>code-graph-storage-neo4j</module>
     <module>code-graph-storage-memory</module>
