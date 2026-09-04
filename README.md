@@ -101,6 +101,25 @@ Check the service:
 curl http://localhost:8084/api/code-graph/health-check
 ```
 
+### Database-backed analysis tasks
+
+`code-graph-app` can queue repository analysis in MySQL or H2. Multiple app instances share the
+same task table: each instance registers a worker, atomically claims work, renews a lease while it
+runs, and retries only after the owning worker's lease expires. Files in one repository task remain
+strictly sequential, while each language reuses one task-scoped parser session. Sessions, parser
+subprocesses, build subprocesses, credentials, and the cloned workspace are released when the task
+finishes or fails.
+
+```bash
+curl http://localhost:8084/api/tasks
+curl http://localhost:8084/api/workers
+curl -X POST http://localhost:8084/api/tasks/{taskId}/cancel
+```
+
+The main controls are `CODEGRAPH_TASK_HEARTBEAT_MS`, `CODEGRAPH_TASK_LEASE_MS`,
+`CODEGRAPH_TASK_RETRY_DELAY_MS`, `CODEGRAPH_TASK_MAX_ATTEMPTS`, and the optional
+`CODEGRAPH_WORKER_ID`. Normally the worker ID is generated from host, process, and a random suffix.
+
 Parse one Java file:
 
 ```bash

@@ -7,6 +7,8 @@ import com.poseidon.codegraph.app.config.RepositoryRequest;
 import com.poseidon.codegraph.app.config.RepositoryView;
 import com.poseidon.codegraph.app.task.AnalysisTask;
 import com.poseidon.codegraph.app.task.AnalysisTaskStore;
+import com.poseidon.codegraph.app.task.AnalysisWorker;
+import com.poseidon.codegraph.app.task.AnalysisWorkerStore;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,10 +28,15 @@ public class RepositoryConfigController {
 
     private final RepositoryConfigStore repositoryStore;
     private final AnalysisTaskStore taskStore;
+    private final AnalysisWorkerStore workerStore;
 
-    public RepositoryConfigController(RepositoryConfigStore repositoryStore, AnalysisTaskStore taskStore) {
+    public RepositoryConfigController(
+            RepositoryConfigStore repositoryStore,
+            AnalysisTaskStore taskStore,
+            AnalysisWorkerStore workerStore) {
         this.repositoryStore = repositoryStore;
         this.taskStore = taskStore;
+        this.workerStore = workerStore;
     }
 
     @GetMapping("/config/projects")
@@ -76,8 +83,10 @@ public class RepositoryConfigController {
     }
 
     @GetMapping("/tasks")
-    public ApiResponse<List<AnalysisTask>> tasks(@RequestParam long repositoryId) {
-        return ApiResponse.success(taskStore.findByRepository(repositoryId));
+    public ApiResponse<List<AnalysisTask>> tasks(@RequestParam(required = false) Long repositoryId) {
+        return ApiResponse.success(repositoryId == null
+            ? taskStore.findRecent()
+            : taskStore.findByRepository(repositoryId));
     }
 
     @GetMapping("/tasks/{taskId}")
@@ -85,6 +94,18 @@ public class RepositoryConfigController {
         return taskStore.findById(taskId)
             .map(ApiResponse::success)
             .orElseGet(() -> ApiResponse.error(404, "任务不存在"));
+    }
+
+    @PostMapping("/tasks/{taskId}/cancel")
+    public ApiResponse<AnalysisTask> cancelTask(@PathVariable String taskId) {
+        return taskStore.cancel(taskId)
+            .map(task -> ApiResponse.success("取消请求已提交", task))
+            .orElseGet(() -> ApiResponse.error(404, "任务不存在"));
+    }
+
+    @GetMapping("/workers")
+    public ApiResponse<List<AnalysisWorker>> workers() {
+        return ApiResponse.success(workerStore.findAll());
     }
 
     private RepositoryView view(RepositoryConfig repository) {
@@ -110,6 +131,9 @@ public class RepositoryConfigController {
     private String status(String repositoryStatus, AnalysisTask latest) {
         if (latest != null) {
             if ("QUEUED".equals(latest.status()) || "RUNNING".equals(latest.status())) return "analyzing";
+            if ("SUCCEEDED".equals(latest.status())) return "done";
+            if ("FAILED".equals(latest.status())) return "failed";
+            if ("CANCELED".equals(latest.status())) return "idle";
         }
         if ("IDLE".equals(repositoryStatus)) return "idle";
         if ("DONE".equals(repositoryStatus)) return "done";

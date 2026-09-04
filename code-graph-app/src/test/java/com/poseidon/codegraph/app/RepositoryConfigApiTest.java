@@ -3,6 +3,8 @@ package com.poseidon.codegraph.app;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.poseidon.codegraph.app.task.AnalysisTaskStore;
+import com.poseidon.codegraph.app.task.AnalysisWorkerIdentity;
+import com.poseidon.codegraph.app.task.AnalysisWorkerStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Map;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -45,6 +48,9 @@ class RepositoryConfigApiTest {
 
     @Autowired
     private AnalysisTaskStore taskStore;
+
+    @Autowired
+    private AnalysisWorkerStore workerStore;
 
     @BeforeEach
     void clearDatabase() {
@@ -84,15 +90,26 @@ class RepositoryConfigApiTest {
             .andReturn().getResponse().getContentAsString();
 
         String taskId = objectMapper.readTree(taskResponse).path("data").path("id").asText();
-        jdbc.update("UPDATE analysis_task SET status = 'RUNNING' WHERE id = ?", taskId);
-        assertThat(taskStore.requeueInterrupted()).isEqualTo(1);
+        assertThat(taskStore.claimNext("api-test", Duration.ofSeconds(30))).isPresent();
+        assertThat(taskStore.recoverExpiredLeases()).isZero();
 
         mockMvc.perform(get("/api/tasks").param("repositoryId", Long.toString(repositoryId)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.length()").value(1))
-            .andExpect(jsonPath("$.data[0].status").value("QUEUED"));
+            .andExpect(jsonPath("$.data[0].status").value("RUNNING"));
 
-        taskStore.succeed(taskId, 0);
+        mockMvc.perform(get("/api/tasks"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].leaseOwner").value("api-test"));
+
+        workerStore.register(new AnalysisWorkerIdentity("api-worker"));
+        workerStore.heartbeat("api-worker", taskId);
+        mockMvc.perform(get("/api/workers"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].workerId").value("api-worker"))
+            .andExpect(jsonPath("$.data[0].activeTaskId").value(taskId));
+
+        assertThat(taskStore.succeed(taskId, "api-test", 0)).isTrue();
 
         mockMvc.perform(put("/api/config/projects/{id}", repositoryId)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -105,7 +122,7 @@ class RepositoryConfigApiTest {
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.hasAccessToken").value(false))
-            .andExpect(jsonPath("$.data.status").value("idle"))
+            .andExpect(jsonPath("$.data.status").value("done"))
             .andExpect(jsonPath("$.data.gitBranch").value("release"));
 
         assertThat(jdbc.queryForObject(

@@ -24,11 +24,31 @@ CREATE TABLE IF NOT EXISTS analysis_task (
     progress_total INT NOT NULL DEFAULT 0,
     message VARCHAR(1024),
     error_details TEXT,
+    attempt_count INT NOT NULL DEFAULT 0,
+    max_attempts INT NOT NULL DEFAULT 3,
+    lease_owner VARCHAR(255),
+    lease_until TIMESTAMP NULL,
+    heartbeat_at TIMESTAMP NULL,
+    next_attempt_at TIMESTAMP NULL,
+    cancel_requested BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     started_at TIMESTAMP NULL,
     finished_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_analysis_task_status_created (status, created_at),
     INDEX idx_analysis_task_repository_created (repository_id, created_at),
     CONSTRAINT fk_analysis_task_repository
         FOREIGN KEY (repository_id) REFERENCES repository_config(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS analysis_worker (
+    worker_id VARCHAR(255) PRIMARY KEY,
+    host_name VARCHAR(255) NOT NULL,
+    process_id BIGINT NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    active_task_id VARCHAR(36),
+    started_at TIMESTAMP NOT NULL,
+    heartbeat_at TIMESTAMP NOT NULL,
+    stopped_at TIMESTAMP NULL,
+    last_error TEXT
 );

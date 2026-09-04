@@ -69,23 +69,25 @@ public final class GitWorkspace {
     }
 
     public String run(List<String> command, Path directory, Map<String, String> environment, Duration timeout) {
+        Process process = null;
         try {
             ProcessBuilder builder = new ProcessBuilder(command)
                 .directory(directory.toFile())
                 .redirectErrorStream(true);
             builder.environment().putAll(environment);
-            Process process = builder.start();
+            process = builder.start();
+            Process startedProcess = process;
             CompletableFuture<String> outputFuture = new CompletableFuture<>();
             Thread.ofVirtual().name("codegraph-command-output").start(() -> {
                 try {
-                    outputFuture.complete(new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8));
+                    outputFuture.complete(new String(startedProcess.getInputStream().readAllBytes(), StandardCharsets.UTF_8));
                 } catch (IOException exception) {
                     outputFuture.completeExceptionally(exception);
                 }
             });
             boolean completed = process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
             if (!completed) {
-                process.destroyForcibly();
+                terminateTree(process);
                 throw new IllegalStateException("命令执行超时: " + command.getFirst());
             }
             String output = outputFuture.get(5, TimeUnit.SECONDS);
@@ -96,11 +98,22 @@ public final class GitWorkspace {
         } catch (IOException exception) {
             throw new IllegalStateException("无法启动命令: " + command.getFirst(), exception);
         } catch (InterruptedException exception) {
+            terminateTree(process);
             Thread.currentThread().interrupt();
             throw new IllegalStateException("命令执行被中断: " + command.getFirst(), exception);
         } catch (java.util.concurrent.TimeoutException | java.util.concurrent.ExecutionException exception) {
+            terminateTree(process);
             throw new IllegalStateException("读取命令输出失败: " + command.getFirst(), exception);
         }
+    }
+
+    private void terminateTree(Process process) {
+        if (process == null) return;
+        List<ProcessHandle> descendants = process.descendants().toList();
+        for (int index = descendants.size() - 1; index >= 0; index--) {
+            descendants.get(index).destroyForcibly();
+        }
+        process.destroyForcibly();
     }
 
     private Map<String, String> authenticationEnvironment(Path taskRoot, RepositoryConfig repository) throws IOException {

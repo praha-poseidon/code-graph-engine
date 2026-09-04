@@ -16,11 +16,13 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 class AnalysisTaskWorkerTest {
@@ -48,8 +50,9 @@ class AnalysisTaskWorkerTest {
         GitWorkspace workspace = mock(GitWorkspace.class);
         IncrementalUpdateService updateService = mock(IncrementalUpdateService.class);
         IncrementalUpdateSession session = mock(IncrementalUpdateSession.class);
-        AnalysisTask task = new AnalysisTask(
-            "task-1", 7L, "RUNNING", 0, 0, null, null, Instant.now(), Instant.now(), null);
+        AnalysisTask task = task("task-1");
+        AnalysisWorkerStore workerStore = mock(AnalysisWorkerStore.class);
+        AnalysisWorkerIdentity identity = new AnalysisWorkerIdentity("worker-test");
         RepositoryConfig repository = repository();
         Path checkout = Files.createDirectories(tempDir.resolve("checkout"));
         Files.writeString(checkout.resolve("main.go"), "package main\n");
@@ -58,16 +61,22 @@ class AnalysisTaskWorkerTest {
         when(repositoryStore.decrypted(repository)).thenReturn(repository);
         when(workspace.cloneRepository("task-1", repository)).thenReturn(checkout);
         when(updateService.openSession("go")).thenReturn(session);
+        when(taskStore.isOwnedAndRunning("task-1", "worker-test")).thenReturn(true);
+        when(taskStore.findById("task-1")).thenReturn(Optional.of(task));
+        when(taskStore.updateProgress(anyString(), eq("worker-test"), anyInt(), anyInt(), anyString()))
+            .thenReturn(true);
         doThrow(new IllegalStateException("semantic parser failed"))
             .when(session).handleFileAdded(
                 anyString(), anyString(), anyString(), anyString(), anyString(),
                 any(String[].class), any(String[].class), anyList(), anyList());
 
-        new AnalysisTaskWorker(taskStore, repositoryStore, workspace, updateService, false).execute(task);
+        new AnalysisTaskWorker(taskStore, repositoryStore, workspace, updateService,
+            workerStore, identity, false, 30000, 0).execute(task);
 
         verify(session).close();
         verify(workspace).cleanup("task-1");
-        verify(taskStore).fail(eq("task-1"), eq("semantic parser failed"), anyString());
+        verify(taskStore).failOrRetry(eq("task-1"), eq("worker-test"),
+            eq("semantic parser failed"), anyString(), any());
     }
 
     @Test
@@ -77,8 +86,9 @@ class AnalysisTaskWorkerTest {
         GitWorkspace workspace = mock(GitWorkspace.class);
         IncrementalUpdateService updateService = mock(IncrementalUpdateService.class);
         IncrementalUpdateSession session = mock(IncrementalUpdateSession.class);
-        AnalysisTask task = new AnalysisTask(
-            "task-2", 7L, "RUNNING", 0, 0, null, null, Instant.now(), Instant.now(), null);
+        AnalysisTask task = task("task-2");
+        AnalysisWorkerStore workerStore = mock(AnalysisWorkerStore.class);
+        AnalysisWorkerIdentity identity = new AnalysisWorkerIdentity("worker-test");
         RepositoryConfig repository = repository();
         Path checkout = Files.createDirectories(tempDir.resolve("checkout-close"));
         Files.writeString(checkout.resolve("main.go"), "package main\n");
@@ -87,14 +97,64 @@ class AnalysisTaskWorkerTest {
         when(repositoryStore.decrypted(repository)).thenReturn(repository);
         when(workspace.cloneRepository("task-2", repository)).thenReturn(checkout);
         when(updateService.openSession("go")).thenReturn(session);
+        when(taskStore.isOwnedAndRunning("task-2", "worker-test")).thenReturn(true);
+        when(taskStore.findById("task-2")).thenReturn(Optional.of(task));
+        when(taskStore.updateProgress(anyString(), eq("worker-test"), anyInt(), anyInt(), anyString()))
+            .thenReturn(true);
+        when(taskStore.succeed("task-2", "worker-test", 1)).thenReturn(true);
         when(session.language()).thenReturn("go");
         doThrow(new IllegalStateException("close failed")).when(session).close();
 
-        new AnalysisTaskWorker(taskStore, repositoryStore, workspace, updateService, false).execute(task);
+        new AnalysisTaskWorker(taskStore, repositoryStore, workspace, updateService,
+            workerStore, identity, false, 30000, 0).execute(task);
 
         verify(session).close();
         verify(workspace).cleanup("task-2");
-        verify(taskStore).succeed("task-2", 1);
+        verify(taskStore).succeed("task-2", "worker-test", 1);
+    }
+
+    @Test
+    void filesOfOneLanguageReuseOneTaskSessionAndAreProcessedSequentially() throws Exception {
+        AnalysisTaskStore taskStore = mock(AnalysisTaskStore.class);
+        RepositoryConfigStore repositoryStore = mock(RepositoryConfigStore.class);
+        GitWorkspace workspace = mock(GitWorkspace.class);
+        IncrementalUpdateService updateService = mock(IncrementalUpdateService.class);
+        IncrementalUpdateSession session = mock(IncrementalUpdateSession.class);
+        AnalysisWorkerStore workerStore = mock(AnalysisWorkerStore.class);
+        AnalysisWorkerIdentity identity = new AnalysisWorkerIdentity("worker-test");
+        AnalysisTask task = task("task-3");
+        RepositoryConfig repository = repository();
+        Path checkout = Files.createDirectories(tempDir.resolve("checkout-reuse"));
+        Files.writeString(checkout.resolve("a.go"), "package demo\n");
+        Files.writeString(checkout.resolve("b.go"), "package demo\n");
+
+        when(repositoryStore.findById(7L)).thenReturn(Optional.of(repository));
+        when(repositoryStore.decrypted(repository)).thenReturn(repository);
+        when(workspace.cloneRepository("task-3", repository)).thenReturn(checkout);
+        when(updateService.openSession("go")).thenReturn(session);
+        when(taskStore.isOwnedAndRunning("task-3", "worker-test")).thenReturn(true);
+        when(taskStore.findById("task-3")).thenReturn(Optional.of(task));
+        when(taskStore.updateProgress(anyString(), eq("worker-test"), anyInt(), anyInt(), anyString()))
+            .thenReturn(true);
+        when(taskStore.succeed("task-3", "worker-test", 2)).thenReturn(true);
+
+        new AnalysisTaskWorker(taskStore, repositoryStore, workspace, updateService,
+            workerStore, identity, false, 30000, 0).execute(task);
+
+        verify(updateService, times(1)).openSession("go");
+        verify(session, times(2)).handleFileAdded(
+            anyString(), anyString(), anyString(), anyString(), anyString(),
+            any(String[].class), any(String[].class), anyList(), anyList());
+        verify(session).close();
+        verify(taskStore).succeed("task-3", "worker-test", 2);
+    }
+
+    private AnalysisTask task(String id) {
+        Instant now = Instant.now();
+        return new AnalysisTask(
+            id, 7L, "RUNNING", 0, 0, null, null,
+            1, 3, "worker-test", now.plusSeconds(30), now, null, false,
+            now, now, null, now);
     }
 
     private RepositoryConfig repository() {

@@ -10,7 +10,15 @@ public record AnalysisTask(
         int progressTotal,
         String message,
         String errorDetails,
+        int attemptCount,
+        int maxAttempts,
+        String leaseOwner,
+        Instant leaseUntil,
+        Instant heartbeatAt,
+        Instant nextAttemptAt,
+        boolean cancelRequested,
         Instant createdAt,
         Instant startedAt,
-        Instant finishedAt) {
+        Instant finishedAt,
+        Instant updatedAt) {
 }

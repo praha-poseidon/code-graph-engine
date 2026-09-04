@@ -4,6 +4,7 @@ import com.poseidon.codegraph.app.config.RepositoryConfig;
 import com.poseidon.codegraph.app.config.RepositoryConfigStore;
 import com.poseidon.codegraph.starter.service.IncrementalUpdateService;
 import com.poseidon.codegraph.starter.service.IncrementalUpdateSession;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Component
@@ -37,7 +39,13 @@ public final class AnalysisTaskWorker {
     private final RepositoryConfigStore repositoryStore;
     private final GitWorkspace workspace;
     private final IncrementalUpdateService incrementalUpdateService;
+    private final AnalysisWorkerStore workerStore;
+    private final AnalysisWorkerIdentity identity;
     private final boolean autoBuild;
+    private final Duration leaseDuration;
+    private final Duration retryDelay;
+    private final AtomicReference<String> activeTaskId = new AtomicReference<>();
+    private final AtomicReference<String> lostLeaseTaskId = new AtomicReference<>();
     private volatile boolean ready;
 
     public AnalysisTaskWorker(
@@ -45,12 +53,20 @@ public final class AnalysisTaskWorker {
             RepositoryConfigStore repositoryStore,
             GitWorkspace workspace,
             IncrementalUpdateService incrementalUpdateService,
-            @Value("${code-graph.tasks.auto-build:true}") boolean autoBuild) {
+            AnalysisWorkerStore workerStore,
+            AnalysisWorkerIdentity identity,
+            @Value("${code-graph.tasks.auto-build:true}") boolean autoBuild,
+            @Value("${code-graph.tasks.lease-ms:30000}") long leaseMillis,
+            @Value("${code-graph.tasks.retry-delay-ms:5000}") long retryDelayMillis) {
         this.taskStore = taskStore;
         this.repositoryStore = repositoryStore;
         this.workspace = workspace;
         this.incrementalUpdateService = incrementalUpdateService;
+        this.workerStore = workerStore;
+        this.identity = identity;
         this.autoBuild = autoBuild;
+        this.leaseDuration = Duration.ofMillis(Math.max(5000, leaseMillis));
+        this.retryDelay = Duration.ofMillis(Math.max(0, retryDelayMillis));
     }
 
     @Scheduled(fixedDelayString = "${code-graph.tasks.poll-delay-ms:1000}")
@@ -58,29 +74,60 @@ public final class AnalysisTaskWorker {
         if (!ready) {
             return;
         }
-        taskStore.claimNext().ifPresent(this::execute);
+        taskStore.recoverExpiredLeases();
+        taskStore.claimNext(identity.workerId(), leaseDuration).ifPresent(task -> {
+            activeTaskId.set(task.id());
+            workerStore.heartbeat(identity.workerId(), task.id());
+            try {
+                execute(task);
+            } finally {
+                activeTaskId.compareAndSet(task.id(), null);
+                lostLeaseTaskId.compareAndSet(task.id(), null);
+                workerStore.heartbeat(identity.workerId(), null);
+            }
+        });
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void recoverInterruptedTasks() {
-        int recovered = taskStore.requeueInterrupted();
+        workerStore.register(identity);
+        int recovered = taskStore.recoverExpiredLeases();
         if (recovered > 0) {
-            log.info("已将 {} 个中断的分析任务重新放回队列", recovered);
+            log.info("已恢复 {} 个租约过期的分析任务", recovered);
         }
         ready = true;
+    }
+
+    @Scheduled(fixedDelayString = "${code-graph.tasks.heartbeat-ms:5000}")
+    public void heartbeat() {
+        if (!ready) return;
+        String taskId = activeTaskId.get();
+        workerStore.heartbeat(identity.workerId(), taskId);
+        workerStore.markStaleOffline(leaseDuration.multipliedBy(2));
+        if (taskId != null && !taskStore.renewLease(taskId, identity.workerId(), leaseDuration)) {
+            lostLeaseTaskId.set(taskId);
+        }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        ready = false;
+        workerStore.markOffline(identity.workerId());
     }
 
     void execute(AnalysisTask task) {
         RepositoryConfig encrypted = repositoryStore.findById(task.repositoryId()).orElse(null);
         if (encrypted == null) {
-            taskStore.fail(task.id(), "仓库不存在", "repositoryId=" + task.repositoryId());
+            taskStore.failOrRetry(task.id(), identity.workerId(), "仓库不存在",
+                "repositoryId=" + task.repositoryId(), retryDelay);
             return;
         }
         repositoryStore.updateStatus(encrypted.id(), "ANALYZING", encrypted.lastAnalyzedAt());
         Map<String, IncrementalUpdateSession> sessions = new HashMap<>();
         try {
             RepositoryConfig repository = repositoryStore.decrypted(encrypted);
-            taskStore.updateProgress(task.id(), 0, 0, "克隆仓库");
+            checkpoint(task.id());
+            progress(task.id(), 0, 0, "克隆仓库");
             Path checkout = workspace.cloneRepository(task.id(), repository);
 
             List<String> classpath = prepareBuild(task.id(), checkout, repository);
@@ -90,11 +137,12 @@ public final class AnalysisTaskWorker {
             }
 
             int total = sourceFiles.size();
-            taskStore.updateProgress(task.id(), 0, total, "开始解析 " + total + " 个文件");
+            progress(task.id(), 0, total, "开始解析 " + total + " 个文件");
             String[] sourceRoots = sourceRoots(checkout);
             String[] dependencies = classpath.toArray(String[]::new);
             int current = 0;
             for (Path file : sourceFiles) {
+                checkpoint(task.id());
                 String projectFilePath = checkout.relativize(file).toString().replace('\\', '/');
                 String language = languageFor(file);
                 IncrementalUpdateSession session = sessions.computeIfAbsent(
@@ -110,17 +158,30 @@ public final class AnalysisTaskWorker {
                     repository.endpointRuleSources(),
                     List.of());
                 current++;
-                taskStore.updateProgress(task.id(), current, total,
-                    "正在解析 " + projectFilePath);
+                progress(task.id(), current, total, "正在解析 " + projectFilePath);
             }
 
-            taskStore.succeed(task.id(), total);
+            checkpoint(task.id());
+            if (!taskStore.succeed(task.id(), identity.workerId(), total)) {
+                throw new TaskLeaseLostException(task.id());
+            }
             repositoryStore.updateStatus(repository.id(), "DONE", Instant.now());
+        } catch (TaskCanceledException exception) {
+            taskStore.markCanceled(task.id(), identity.workerId(), "任务已取消");
+            repositoryStore.updateStatus(encrypted.id(), "IDLE", encrypted.lastAnalyzedAt());
+        } catch (TaskLeaseLostException exception) {
+            log.warn("停止已丢失租约的分析任务: taskId={}, workerId={}", task.id(), identity.workerId());
         } catch (Exception exception) {
             log.error("异步分析任务失败: taskId={}, repositoryId={}", task.id(), task.repositoryId(), exception);
             String message = rootMessage(exception);
-            taskStore.fail(task.id(), message, stackSummary(exception));
-            repositoryStore.updateStatus(encrypted.id(), "FAILED", encrypted.lastAnalyzedAt());
+            TaskFailureDisposition disposition = taskStore.failOrRetry(
+                task.id(), identity.workerId(), message, stackSummary(exception), retryDelay);
+            workerStore.recordError(identity.workerId(), stackSummary(exception));
+            if (disposition == TaskFailureDisposition.FAILED) {
+                repositoryStore.updateStatus(encrypted.id(), "FAILED", encrypted.lastAnalyzedAt());
+            } else if (disposition == TaskFailureDisposition.CANCELED) {
+                repositoryStore.updateStatus(encrypted.id(), "IDLE", encrypted.lastAnalyzedAt());
+            }
         } finally {
             sessions.values().forEach(session -> {
                 try {
@@ -139,18 +200,34 @@ public final class AnalysisTaskWorker {
             return existingClasspath(checkout);
         }
         if (Files.exists(checkout.resolve("pom.xml"))) {
-            taskStore.updateProgress(taskId, 0, 0, "执行 Maven 构建并解析依赖");
+            progress(taskId, 0, 0, "执行 Maven 构建并解析依赖");
             String executable = Files.isRegularFile(checkout.resolve("mvnw")) ? "./mvnw" : "mvn";
             workspace.run(List.of(executable, "-q", "-DskipTests", "package",
                 "dependency:build-classpath", "-Dmdep.outputFile=.codegraph-classpath"),
                 checkout, Map.of(), Duration.ofMinutes(15));
         } else if (Files.exists(checkout.resolve("build.gradle")) || Files.exists(checkout.resolve("build.gradle.kts"))) {
-            taskStore.updateProgress(taskId, 0, 0, "执行 Gradle 构建");
+            progress(taskId, 0, 0, "执行 Gradle 构建");
             String executable = Files.isRegularFile(checkout.resolve("gradlew")) ? "./gradlew" : "gradle";
             workspace.run(List.of(executable, "classes", "--no-daemon"),
                 checkout, Map.of(), Duration.ofMinutes(15));
         }
         return existingClasspath(checkout);
+    }
+
+    private void progress(String taskId, int current, int total, String message) {
+        if (!taskStore.updateProgress(taskId, identity.workerId(), current, total, message)) {
+            throw new TaskLeaseLostException(taskId);
+        }
+    }
+
+    private void checkpoint(String taskId) {
+        if (taskId.equals(lostLeaseTaskId.get()) || !taskStore.isOwnedAndRunning(taskId, identity.workerId())) {
+            throw new TaskLeaseLostException(taskId);
+        }
+        AnalysisTask current = taskStore.findById(taskId).orElseThrow(() -> new TaskLeaseLostException(taskId));
+        if (current.cancelRequested()) {
+            throw new TaskCanceledException(taskId);
+        }
     }
 
     private List<String> existingClasspath(Path checkout) {
@@ -245,5 +322,17 @@ public final class AnalysisTaskWorker {
             current = current.getCause();
         }
         return output.length() > 12000 ? output.substring(0, 12000) : output.toString();
+    }
+
+    private static final class TaskCanceledException extends RuntimeException {
+        private TaskCanceledException(String taskId) {
+            super("Task canceled: " + taskId);
+        }
+    }
+
+    private static final class TaskLeaseLostException extends RuntimeException {
+        private TaskLeaseLostException(String taskId) {
+            super("Task lease lost: " + taskId);
+        }
     }
 }

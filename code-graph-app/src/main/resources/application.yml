@@ -13,6 +13,10 @@ spring:
     init:
       mode: always
       schema-locations: classpath:db/schema.sql
+  task:
+    scheduling:
+      pool:
+        size: ${CODEGRAPH_SCHEDULER_POOL_SIZE:2}
 
 code-graph:
   storage:
@@ -23,6 +27,11 @@ code-graph:
   tasks:
     enabled: ${CODEGRAPH_TASKS_ENABLED:true}
     poll-delay-ms: ${CODEGRAPH_TASK_POLL_DELAY_MS:1000}
+    heartbeat-ms: ${CODEGRAPH_TASK_HEARTBEAT_MS:5000}
+    lease-ms: ${CODEGRAPH_TASK_LEASE_MS:30000}
+    retry-delay-ms: ${CODEGRAPH_TASK_RETRY_DELAY_MS:5000}
+    max-attempts: ${CODEGRAPH_TASK_MAX_ATTEMPTS:3}
+    worker-id: ${CODEGRAPH_WORKER_ID:}
     auto-build: ${CODEGRAPH_AUTO_BUILD:true}
 
 logging:
