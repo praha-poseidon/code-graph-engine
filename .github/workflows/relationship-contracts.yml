@@ -1,0 +1,266 @@
+name: Source-to-Neo4j relationship contracts
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/relationship-contracts.yml'
+      - 'scripts/assert_contract_reports.py'
+      - 'code-graph-model/**'
+      - 'code-graph-parser-process/**'
+      - 'code-graph-core/**'
+      - 'code-graph-storage-neo4j/**'
+      - 'code-graph-spring-boot-starter/**'
+      - 'code-graph-app/**'
+      - 'pom.xml'
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/relationship-contracts.yml'
+      - 'scripts/assert_contract_reports.py'
+      - 'code-graph-model/**'
+      - 'code-graph-parser-process/**'
+      - 'code-graph-core/**'
+      - 'code-graph-storage-neo4j/**'
+      - 'code-graph-spring-boot-starter/**'
+      - 'code-graph-app/**'
+      - 'pom.xml'
+
+permissions:
+  contents: read
+
+jobs:
+  linux-language-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      neo4j:
+        image: neo4j:5-community
+        env:
+          NEO4J_AUTH: neo4j/contract-password
+        ports:
+          - 7687:7687
+        options: >-
+          --health-cmd "bash -c ':> /dev/tcp/127.0.0.1/7687'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+
+    steps:
+      - name: Check out Engine
+        uses: actions/checkout@v4
+        with:
+          path: workspace/code-graph-engine
+
+      - name: Check out parser and extractor sources
+        uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/code-graph-parser-java
+          path: workspace/code-graph-parser-java
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/static-extract-java
+          path: workspace/static-extract-java
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/static-extract-spec
+          path: workspace/static-extract-spec
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/code-graph-parser-go
+          path: workspace/code-graph-parser-go
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/static-extract-go
+          path: workspace/static-extract-go
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/code-graph-parser-js
+          path: workspace/code-graph-parser-js
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/static-extract-js
+          path: workspace/static-extract-js
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/code-graph-parser-python
+          path: workspace/code-graph-parser-python
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/static-extract-python
+          path: workspace/static-extract-python
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/code-graph-parser-php
+          path: workspace/code-graph-parser-php
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/static-extract-php
+          path: workspace/static-extract-php
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/code-graph-parser-kotlin
+          path: workspace/code-graph-parser-kotlin
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/static-extract-kotlin
+          path: workspace/static-extract-kotlin
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.12'
+          cache-dependency-path: workspace/code-graph-parser-go/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.19.0'
+          cache: npm
+          cache-dependency-path: |
+            workspace/static-extract-js/package-lock.json
+            workspace/code-graph-parser-js/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            workspace/static-extract-python/pyproject.toml
+            workspace/code-graph-parser-python/pyproject.toml
+
+      - name: Build Java and Kotlin CLIs
+        working-directory: workspace
+        run: |
+          mvn -B -f static-extract-java/pom.xml -DskipTests -Djacoco.skip=true install
+          mvn -B -f code-graph-parser-java/pom.xml -DskipTests package
+          mvn -B -f static-extract-kotlin/pom.xml -DskipTests install
+          mvn -B -f code-graph-parser-kotlin/pom.xml -DskipTests package
+
+      - name: Build Go CLI and install gopls
+        working-directory: workspace/code-graph-parser-go
+        run: |
+          go install golang.org/x/tools/gopls@v0.18.1
+          go build -o bin/parser-go ./cmd/parser-go
+          echo "CODEGRAPH_GOPLS_COMMAND=$(go env GOPATH)/bin/gopls" >> "$GITHUB_ENV"
+
+      - name: Build and test JavaScript CLI
+        working-directory: workspace
+        run: |
+          npm --prefix static-extract-js ci
+          npm --prefix static-extract-js run build
+          npm --prefix code-graph-parser-js ci
+          npm --prefix code-graph-parser-js run build
+          npm --prefix code-graph-parser-js test
+
+      - name: Install and test Python CLI
+        working-directory: workspace
+        run: |
+          python -m pip install pytest ./static-extract-python ./code-graph-parser-python
+          python -m pytest -q code-graph-parser-python/tests
+
+      - name: Install and test PHP CLI
+        working-directory: workspace/code-graph-parser-php
+        run: |
+          composer install --no-interaction
+          composer test
+
+      - name: Locate parser commands
+        working-directory: workspace
+        run: |
+          java_cli_jar="$(find code-graph-parser-java/target -maxdepth 1 -type f -name '*-cli.jar' | head -n 1)"
+          test -n "$java_cli_jar"
+          {
+            echo "JAVA_CODE_GRAPH_CLI_JAR=$GITHUB_WORKSPACE/workspace/$java_cli_jar"
+            echo "GO_CODE_GRAPH_CLI=$GITHUB_WORKSPACE/workspace/code-graph-parser-go/bin/parser-go"
+            echo "FRONTEND_CODE_GRAPH_CLI=$GITHUB_WORKSPACE/workspace/code-graph-parser-js/dist/cli.js"
+            echo "PYTHON_CODE_GRAPH_CLI=$GITHUB_WORKSPACE/workspace/code-graph-parser-python/bin/parser-python"
+            echo "PHP_CODE_GRAPH_CLI=$GITHUB_WORKSPACE/workspace/code-graph-parser-php/bin/parser-php"
+            echo "KOTLIN_CODE_GRAPH_CLI=$GITHUB_WORKSPACE/workspace/code-graph-parser-kotlin/bin/parser-kotlin"
+          } >> "$GITHUB_ENV"
+
+      - name: Run production Neo4j contracts
+        working-directory: workspace/code-graph-engine
+        env:
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USERNAME: neo4j
+          NEO4J_PASSWORD: contract-password
+        run: >-
+          mvn -B -pl code-graph-app -am
+          -Dsurefire.failIfNoSpecifiedTests=false
+          -Dtest=JavaProcessParserEndToEndTest,GoProcessParserEndToEndTest,FrontendProcessParserEndToEndTest,PythonProcessParserEndToEndTest,PhpProcessParserEndToEndTest,KotlinProcessParserEndToEndTest
+          test
+
+      - name: Require every Linux contract test to execute
+        working-directory: workspace/code-graph-engine
+        run: |
+          python3 scripts/assert_contract_reports.py code-graph-app/target/surefire-reports \
+            JavaProcessParserEndToEndTest:2 \
+            GoProcessParserEndToEndTest:2 \
+            FrontendProcessParserEndToEndTest:4 \
+            PythonProcessParserEndToEndTest:4 \
+            PhpProcessParserEndToEndTest:4 \
+            KotlinProcessParserEndToEndTest:4
+
+  swift-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container: swift:6.3.2-jammy
+    services:
+      neo4j:
+        image: neo4j:5-community
+        env:
+          NEO4J_AUTH: neo4j/contract-password
+        options: >-
+          --health-cmd "bash -c ':> /dev/tcp/127.0.0.1/7687'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+
+    steps:
+      - name: Check out Engine
+        uses: actions/checkout@v4
+        with:
+          path: workspace/code-graph-engine
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/code-graph-parser-swift
+          path: workspace/code-graph-parser-swift
+      - uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/static-extract-swift
+          path: workspace/static-extract-swift
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Install Maven
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends maven
+
+      - name: Build Swift CLI
+        working-directory: workspace/code-graph-parser-swift
+        run: swift build -c release --product parser-swift
+
+      - name: Run production Neo4j Swift contract
+        working-directory: workspace/code-graph-engine
+        env:
+          SWIFT_CODE_GRAPH_CLI: ${{ github.workspace }}/workspace/code-graph-parser-swift/.build/release/parser-swift
+          NEO4J_URI: bolt://neo4j:7687
+          NEO4J_USERNAME: neo4j
+          NEO4J_PASSWORD: contract-password
+        run: >-
+          mvn -B -pl code-graph-app -am
+          -Dsurefire.failIfNoSpecifiedTests=false
+          -Dtest=SwiftProcessParserEndToEndTest
+          test
+
+      - name: Require every Swift contract test to execute
+        working-directory: workspace/code-graph-engine
+        run: >-
+          python3 scripts/assert_contract_reports.py code-graph-app/target/surefire-reports
+          SwiftProcessParserEndToEndTest:2

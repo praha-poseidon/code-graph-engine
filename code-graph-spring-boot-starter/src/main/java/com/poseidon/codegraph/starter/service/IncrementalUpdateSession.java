@@ -43,9 +43,9 @@ public final class IncrementalUpdateSession implements AutoCloseable {
             boolean cascade,
             List<String> endpointRuleSources,
             List<String> traceRuleSources) {
-        ensureOpen();
-        service.handleFileChange(projectName, absoluteFilePath, projectFilePath, gitRepoUrl, gitBranch,
-            classpathEntries, sourcepathEntries, cascade, endpointRuleSources, traceRuleSources);
+        execute(() -> service.handleFileChange(
+            projectName, absoluteFilePath, projectFilePath, gitRepoUrl, gitBranch,
+            classpathEntries, sourcepathEntries, cascade, endpointRuleSources, traceRuleSources));
     }
 
     public synchronized void handleFileAdded(
@@ -58,9 +58,9 @@ public final class IncrementalUpdateSession implements AutoCloseable {
             String[] sourcepathEntries,
             List<String> endpointRuleSources,
             List<String> traceRuleSources) {
-        ensureOpen();
-        service.handleFileAdded(projectName, absoluteFilePath, projectFilePath, gitRepoUrl, gitBranch,
-            classpathEntries, sourcepathEntries, endpointRuleSources, traceRuleSources);
+        execute(() -> service.handleFileAdded(
+            projectName, absoluteFilePath, projectFilePath, gitRepoUrl, gitBranch,
+            classpathEntries, sourcepathEntries, endpointRuleSources, traceRuleSources));
     }
 
     public synchronized void handleFileModified(
@@ -74,9 +74,9 @@ public final class IncrementalUpdateSession implements AutoCloseable {
             List<String> endpointRuleSources,
             List<String> traceRuleSources,
             Map<String, Map<String, List<String>>> externalValues) {
-        ensureOpen();
-        service.handleFileModified(projectName, absoluteFilePath, projectFilePath, gitRepoUrl, gitBranch,
-            classpathEntries, sourcepathEntries, endpointRuleSources, traceRuleSources, externalValues);
+        execute(() -> service.handleFileModified(
+            projectName, absoluteFilePath, projectFilePath, gitRepoUrl, gitBranch,
+            classpathEntries, sourcepathEntries, endpointRuleSources, traceRuleSources, externalValues));
     }
 
     public synchronized void handleFileDeleted(
@@ -87,9 +87,23 @@ public final class IncrementalUpdateSession implements AutoCloseable {
             String gitBranch,
             String[] classpathEntries,
             String[] sourcepathEntries) {
+        execute(() -> service.handleFileDeleted(
+            projectName, absoluteFilePath, projectFilePath, gitRepoUrl, gitBranch,
+            classpathEntries, sourcepathEntries));
+    }
+
+    private void execute(SessionOperation operation) {
         ensureOpen();
-        service.handleFileDeleted(projectName, absoluteFilePath, projectFilePath, gitRepoUrl, gitBranch,
-            classpathEntries, sourcepathEntries);
+        try {
+            operation.run();
+        } catch (RuntimeException | Error failure) {
+            try {
+                close();
+            } catch (RuntimeException | Error closeFailure) {
+                failure.addSuppressed(closeFailure);
+            }
+            throw failure;
+        }
     }
 
     private void ensureOpen() {
@@ -105,5 +119,10 @@ public final class IncrementalUpdateSession implements AutoCloseable {
         }
         closed = true;
         parserSession.close();
+    }
+
+    @FunctionalInterface
+    private interface SessionOperation {
+        void run();
     }
 }

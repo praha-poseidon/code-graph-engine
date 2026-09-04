@@ -3,6 +3,7 @@ package com.poseidon.codegraph.app;
 import com.poseidon.codegraph.engine.application.model.CodeEndpointDO;
 import com.poseidon.codegraph.model.RelationshipType;
 import com.poseidon.codegraph.starter.service.IncrementalUpdateService;
+import com.poseidon.codegraph.starter.service.IncrementalUpdateSession;
 import com.poseidon.codegraph.storage.memory.repository.InMemoryCodeGraphRepository;
 import com.poseidon.codegraph.storage.neo4j.repository.Neo4jCodeEndpointRepository;
 import com.poseidon.codegraph.storage.neo4j.repository.Neo4jCodeFunctionRepository;
@@ -71,9 +72,11 @@ class FrontendProcessParserEndToEndTest {
     static void configureExternalParser() {
         System.setProperty("codegraph.parser.process.languages", "typescript javascript");
         System.setProperty("codegraph.parser.process.typescript.command",
-            "node '" + System.getenv("FRONTEND_CODE_GRAPH_CLI") + "' --stdio");
+            "node '" + System.getenv("FRONTEND_CODE_GRAPH_CLI") + "' --stdio-stream");
         System.setProperty("codegraph.parser.process.javascript.command",
-            "node '" + System.getenv("FRONTEND_CODE_GRAPH_CLI") + "' --stdio");
+            "node '" + System.getenv("FRONTEND_CODE_GRAPH_CLI") + "' --stdio-stream");
+        System.setProperty("codegraph.parser.process.typescript.streaming", "true");
+        System.setProperty("codegraph.parser.process.javascript.streaming", "true");
         System.setProperty("codegraph.parser.process.timeoutSeconds", "30");
     }
 
@@ -82,6 +85,8 @@ class FrontendProcessParserEndToEndTest {
         System.clearProperty("codegraph.parser.process.languages");
         System.clearProperty("codegraph.parser.process.typescript.command");
         System.clearProperty("codegraph.parser.process.javascript.command");
+        System.clearProperty("codegraph.parser.process.typescript.streaming");
+        System.clearProperty("codegraph.parser.process.javascript.streaming");
         System.clearProperty("codegraph.parser.process.timeoutSeconds");
     }
 
@@ -134,10 +139,12 @@ class FrontendProcessParserEndToEndTest {
             repository
         );
         Path projectRoot = frontendParserRoot().resolve("fixtures/type-relations");
-        add(service, TYPE_PROJECT, projectRoot, "src/contracts.ts");
-        add(service, TYPE_PROJECT, projectRoot, "src/other.ts");
-        add(service, TYPE_PROJECT, projectRoot, "src/service.ts");
-        add(service, TYPE_PROJECT, projectRoot, "src/page.ts");
+        try (IncrementalUpdateSession session = service.openSession("typescript")) {
+            add(session, TYPE_PROJECT, projectRoot, "src/contracts.ts");
+            add(session, TYPE_PROJECT, projectRoot, "src/other.ts");
+            add(session, TYPE_PROJECT, projectRoot, "src/service.ts");
+            add(session, TYPE_PROJECT, projectRoot, "src/page.ts");
+        }
 
         String userService = TYPE_PROJECT + "::src/service.ts::UserService";
         String baseService = TYPE_PROJECT + "::src/contracts.ts::BaseService";
@@ -192,10 +199,12 @@ class FrontendProcessParserEndToEndTest {
             );
 
             Path projectRoot = frontendParserRoot().resolve("fixtures/type-relations");
-            add(service, TYPE_PROJECT, projectRoot, "src/contracts.ts");
-            add(service, TYPE_PROJECT, projectRoot, "src/other.ts");
-            add(service, TYPE_PROJECT, projectRoot, "src/service.ts");
-            add(service, TYPE_PROJECT, projectRoot, "src/page.ts");
+            try (IncrementalUpdateSession session = service.openSession("typescript")) {
+                add(session, TYPE_PROJECT, projectRoot, "src/contracts.ts");
+                add(session, TYPE_PROJECT, projectRoot, "src/other.ts");
+                add(session, TYPE_PROJECT, projectRoot, "src/service.ts");
+                add(session, TYPE_PROJECT, projectRoot, "src/page.ts");
+            }
 
             String userService = TYPE_PROJECT + "::src/service.ts::UserService";
             String baseService = TYPE_PROJECT + "::src/contracts.ts::BaseService";
@@ -286,6 +295,24 @@ class FrontendProcessParserEndToEndTest {
             Path projectRoot,
             String projectFilePath) {
         service.handleFileAdded(
+            projectName,
+            projectRoot.resolve(projectFilePath).toString(),
+            projectFilePath,
+            "git@example/" + projectName + ".git",
+            "main",
+            new String[0],
+            new String[] { projectRoot.resolve("src").toString() },
+            List.of(FETCH_RULE, REQUEST_RULE),
+            List.of()
+        );
+    }
+
+    private static void add(
+            IncrementalUpdateSession session,
+            String projectName,
+            Path projectRoot,
+            String projectFilePath) {
+        session.handleFileAdded(
             projectName,
             projectRoot.resolve(projectFilePath).toString(),
             projectFilePath,

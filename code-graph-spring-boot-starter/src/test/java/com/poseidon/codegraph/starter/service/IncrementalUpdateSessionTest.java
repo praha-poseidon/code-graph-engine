@@ -61,9 +61,60 @@ class IncrementalUpdateSessionTest {
             "demo", "/repo/main.go", "main.go", null, null, new String[0], new String[0]));
     }
 
+    @Test
+    void processingFailureImmediatelyClosesSession() {
+        TrackingParser parser = new TrackingParser();
+        IncrementalUpdateService service = new IncrementalUpdateService(
+            mock(CodePackageRepository.class),
+            mock(CodeUnitRepository.class),
+            mock(CodeFunctionRepository.class),
+            mock(CodeRelationshipRepository.class),
+            mock(CodeEndpointRepository.class),
+            new CodeGraphParserRegistry(List.of(parser)));
+        IncrementalUpdateSession session = service.openSession("go");
+
+        assertThrows(RuntimeException.class, () -> session.handleFileAdded(
+            "demo", "/repo/main.go", "main.go", null, null,
+            new String[0], new String[0], List.of(), List.of()));
+
+        assertEquals(1, parser.closed.get());
+        assertThrows(IllegalStateException.class, () -> session.handleFileDeleted(
+            "demo", "/repo/main.go", "main.go", null, null, new String[0], new String[0]));
+    }
+
+    @Test
+    void closeFailureIsSuppressedWithoutHidingProcessingFailure() {
+        TrackingParser parser = new TrackingParser(true);
+        IncrementalUpdateService service = new IncrementalUpdateService(
+            mock(CodePackageRepository.class),
+            mock(CodeUnitRepository.class),
+            mock(CodeFunctionRepository.class),
+            mock(CodeRelationshipRepository.class),
+            mock(CodeEndpointRepository.class),
+            new CodeGraphParserRegistry(List.of(parser)));
+        IncrementalUpdateSession session = service.openSession("go");
+
+        RuntimeException failure = assertThrows(RuntimeException.class, () -> session.handleFileAdded(
+            "demo", "/repo/main.go", "main.go", null, null,
+            new String[0], new String[0], List.of(), List.of()));
+
+        assertEquals(1, parser.closed.get());
+        assertEquals(1, failure.getSuppressed().length);
+        assertEquals("close failed", failure.getSuppressed()[0].getMessage());
+    }
+
     private static final class TrackingParser implements CodeGraphParser {
         private final AtomicInteger opened = new AtomicInteger();
         private final AtomicInteger closed = new AtomicInteger();
+        private final boolean closeFails;
+
+        private TrackingParser() {
+            this(false);
+        }
+
+        private TrackingParser(boolean closeFails) {
+            this.closeFails = closeFails;
+        }
 
         @Override
         public String language() {
@@ -92,6 +143,9 @@ class IncrementalUpdateSessionTest {
                 @Override
                 public void close() {
                     closed.incrementAndGet();
+                    if (closeFails) {
+                        throw new IllegalStateException("close failed");
+                    }
                 }
             };
         }

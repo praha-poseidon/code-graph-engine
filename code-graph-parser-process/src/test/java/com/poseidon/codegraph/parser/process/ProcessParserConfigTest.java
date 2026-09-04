@@ -3,16 +3,23 @@ package com.poseidon.codegraph.parser.process;
 import com.poseidon.codegraph.model.delta.ParseRequest;
 import com.poseidon.codegraph.spi.CodeGraphParserSession;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ProcessParserConfigTest {
+
+    @TempDir
+    Path tempDir;
 
     @Test
     void splitPreservesQuotedArguments() {
@@ -97,6 +104,41 @@ class ProcessParserConfigTest {
                 null, null, null, List.of(), List.of(), Map.of(), Map.of("projectFilePath", "main.go"));
             assertThrows(IllegalArgumentException.class, () -> session.parse(otherProject));
         }
+    }
+
+    @Test
+    void streamingProtocolFailureClosesSessionAndTerminatesChildProcessTree() throws Exception {
+        String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        Path pidFile = tempDir.resolve("parser-processes.txt");
+        ProcessCodeGraphParser parser = new ProcessCodeGraphParser(
+            "go",
+            List.of(
+                javaBin,
+                "-cp",
+                System.getProperty("java.class.path"),
+                MalformedStreamingExternalParser.class.getName(),
+                pidFile.toString()),
+            Duration.ofSeconds(10),
+            true
+        );
+
+        CodeGraphParserSession session = parser.openSession();
+        assertThrows(ProcessParserProtocolException.class, () -> session.parse(request()));
+        assertThrows(IllegalStateException.class, () -> session.parse(request()));
+
+        List<Long> pids = Files.readAllLines(pidFile).stream().map(Long::parseLong).toList();
+        assertEquals(2, pids.size());
+        for (long pid : pids) {
+            ProcessHandle.of(pid).ifPresent(handle -> {
+                try {
+                    handle.onExit().get(5, TimeUnit.SECONDS);
+                } catch (Exception ignored) {
+                    // The assertion below reports the actual leak.
+                }
+                assertFalse(handle.isAlive(), "leaked parser process pid=" + pid);
+            });
+        }
+        session.close();
     }
 
     @Test
@@ -470,5 +512,35 @@ class SlowExternalParser {
     public static void main(String[] args) throws Exception {
         System.in.readAllBytes();
         Thread.sleep(5_000);
+    }
+}
+
+class MalformedStreamingExternalParser {
+
+    public static void main(String[] args) throws Exception {
+        String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        Process child = new ProcessBuilder(
+            javaBin,
+            "-cp",
+            System.getProperty("java.class.path"),
+            StreamingChildProcess.class.getName()).start();
+        Files.writeString(Path.of(args[0]), ProcessHandle.current().pid() + "\n" + child.pid() + "\n");
+
+        java.io.BufferedReader input = new java.io.BufferedReader(
+            new java.io.InputStreamReader(System.in, java.nio.charset.StandardCharsets.UTF_8));
+        if (input.readLine() != null) {
+            System.out.println("not-json");
+            System.out.flush();
+        }
+        while (input.readLine() != null) {
+            // Keep the parser and its semantic child alive until Engine closes the failed session.
+        }
+    }
+}
+
+class StreamingChildProcess {
+
+    public static void main(String[] args) throws Exception {
+        Thread.sleep(60_000);
     }
 }

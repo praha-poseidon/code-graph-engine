@@ -1,5 +1,6 @@
 package com.poseidon.codegraph.app;
 
+import com.poseidon.codegraph.engine.application.repository.CodeRelationshipRepository;
 import com.poseidon.codegraph.model.RelationshipType;
 import com.poseidon.codegraph.model.delta.ParseRequest;
 import com.poseidon.codegraph.model.event.ChangeType;
@@ -113,6 +114,75 @@ class PhpProcessParserEndToEndTest {
         assertThat(delta.relationships())
             .extracting(relationship -> relationship.getRelationshipType())
             .contains(RelationshipType.ENDPOINT_TO_FUNCTION);
+    }
+
+    /** PHP oracle: interface extension, class inheritance, trait use and overrides are separate. */
+    @Test
+    void phpNativeSemanticOracleSurvivesEnginePersistence() {
+        Path root = phpParserRoot().resolve("fixtures/semantics/src");
+        Path source = root.resolve("Relations.php");
+
+        InMemoryCodeGraphRepository repository = new InMemoryCodeGraphRepository();
+        IncrementalUpdateService service = new IncrementalUpdateService(
+            repository, repository, repository, repository, repository);
+        service.handleFileAdded(
+            PROJECT,
+            source.toString(),
+            "src/Relations.php",
+            "git@example/php-semantics.git",
+            "main",
+            new String[0],
+            new String[] {root.toString()});
+
+        assertPhpSemanticOracle(repository);
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "NEO4J_URI", matches = ".+")
+    void phpNativeSemanticOracleMatchesPersistedNeo4jEdges() {
+        Path root = phpParserRoot().resolve("fixtures/semantics/src");
+        Path source = root.resolve("Relations.php");
+        try (Neo4jContractGraph graph = Neo4jContractGraph.open(PROJECT)) {
+            graph.service().handleFileAdded(
+                PROJECT,
+                source.toString(),
+                "src/Relations.php",
+                "git@example/php-semantics.git",
+                "main",
+                new String[0],
+                new String[] {root.toString()});
+            assertPhpSemanticOracle(graph.relationships());
+        }
+    }
+
+    private void assertPhpSemanticOracle(CodeRelationshipRepository repository) {
+        assertEdge(repository, "unit:App\\ChildGateway", "EXTENDS", "unit:App\\Gateway");
+        assertEdge(repository, "unit:App\\Service", "EXTENDS", "unit:App\\Base");
+        assertEdge(repository, "unit:App\\Service", "IMPLEMENTS", "unit:App\\ChildGateway");
+        assertEdge(repository, "unit:App\\Service", "USES_TRAIT", "unit:App\\Logs");
+        assertEdge(repository, "fn:App\\Service::run()", "OVERRIDES", "fn:App\\Base::run()");
+        assertEdge(repository, "fn:App\\Service::send()", "OVERRIDES", "fn:App\\Gateway::send()");
+        assertEdge(repository, "fn:App\\Service::receive()", "OVERRIDES", "fn:App\\ChildGateway::receive()");
+        assertNoEdge(repository, "fn:App\\Service::hidden()", "OVERRIDES", "fn:App\\Base::hidden()");
+        assertNoEdge(repository, "fn:App\\Unrelated::send()", "OVERRIDES", "fn:App\\Gateway::send()");
+    }
+
+    private void assertEdge(CodeRelationshipRepository repository, String from, String type, String to) {
+        assertThat(repository.findOutgoingRelationships(PROJECT, scoped(from), type))
+            .as("PHP persisted edge %s -[%s]-> %s", from, type, to)
+            .extracting(relationship -> relationship.getToNodeId())
+            .contains(scoped(to));
+    }
+
+    private void assertNoEdge(CodeRelationshipRepository repository, String from, String type, String to) {
+        assertThat(repository.findOutgoingRelationships(PROJECT, scoped(from), type))
+            .as("forbidden PHP edge %s -[%s]-> %s", from, type, to)
+            .extracting(relationship -> relationship.getToNodeId())
+            .doesNotContain(scoped(to));
+    }
+
+    private String scoped(String id) {
+        return PROJECT + "::" + id;
     }
 
     private static Path phpParserRoot() {

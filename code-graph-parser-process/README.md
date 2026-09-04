@@ -45,7 +45,7 @@ For the frontend React parser:
 
 ```bash
 -Dcodegraph.parser.process.languages=typescript
--Dcodegraph.parser.process.typescript.command="/path/to/parser-js --stdio"
+-Dcodegraph.parser.process.typescript.command="/path/to/parser-js --stdio-stream"
 ```
 
 For the PHP parser:

@@ -19,6 +19,8 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
@@ -79,6 +81,7 @@ public final class ProcessCodeGraphParser implements CodeGraphParser {
         Process process = startProcess();
         CompletableFuture<String> stdout = readAsync(process.getInputStream());
         CompletableFuture<String> stderr = readAsync(process.getErrorStream());
+        boolean completed = false;
 
         try (OutputStream stdin = process.getOutputStream()) {
             OBJECT_MAPPER.writeValue(stdin, request);
@@ -86,7 +89,6 @@ public final class ProcessCodeGraphParser implements CodeGraphParser {
 
             boolean finished = process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
             if (!finished) {
-                process.destroyForcibly();
                 throw new ProcessParserTimeoutException(language, command, timeout);
             }
 
@@ -98,15 +100,20 @@ public final class ProcessCodeGraphParser implements CodeGraphParser {
             if (output == null || output.isBlank()) {
                 throw new ProcessParserProtocolException("External parser returned empty output", language, command, output);
             }
-            return decodeDelta(output, request);
+            GraphDelta delta = decodeDelta(output, request);
+            completed = true;
+            return delta;
         } catch (IOException e) {
             throw new ProcessParserException("External parser IO failed: language=" + language
                 + ", command=" + command, language, command, e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            process.destroyForcibly();
             throw new ProcessParserException("External parser interrupted: language=" + language
                 + ", command=" + command, language, command, e);
+        } finally {
+            if (!completed) {
+                terminateProcessTree(process);
+            }
         }
     }
 
@@ -193,6 +200,80 @@ public final class ProcessCodeGraphParser implements CodeGraphParser {
         return result;
     }
 
+    /**
+     * Terminates the parser and every subprocess that belongs to it (for example gopls or a
+     * language server). Killing only the direct process leaks those children when the protocol
+     * fails or a task is cancelled.
+     */
+    private void terminateProcessTree(Process process) {
+        List<ProcessHandle> descendants = new ArrayList<>(process.descendants().toList());
+        descendants.sort(Comparator.comparingInt(ProcessCodeGraphParser::processDepth).reversed());
+        descendants.forEach(ProcessCodeGraphParser::destroyQuietly);
+        destroyQuietly(process.toHandle());
+
+        long waitMillis = Math.max(1, Math.min(timeout.toMillis(), 1_000));
+        waitForExit(process.toHandle(), waitMillis);
+
+        descendants.stream().filter(ProcessHandle::isAlive).forEach(ProcessCodeGraphParser::destroyForciblyQuietly);
+        if (process.isAlive()) {
+            destroyForciblyQuietly(process.toHandle());
+        }
+    }
+
+    private static int processDepth(ProcessHandle handle) {
+        int depth = 0;
+        ProcessHandle current = handle;
+        while (true) {
+            var parent = current.parent();
+            if (parent.isEmpty()) {
+                return depth;
+            }
+            depth++;
+            current = parent.orElseThrow();
+        }
+    }
+
+    private static void destroyQuietly(ProcessHandle handle) {
+        try {
+            if (handle.isAlive()) {
+                handle.destroy();
+            }
+        } catch (RuntimeException ignored) {
+            // Best effort continues with destroyForcibly below.
+        }
+    }
+
+    private static void destroyForciblyQuietly(ProcessHandle handle) {
+        try {
+            if (handle.isAlive()) {
+                handle.destroyForcibly();
+            }
+        } catch (RuntimeException ignored) {
+            // The operating system may have already reaped the process.
+        }
+    }
+
+    private static void waitForExit(ProcessHandle handle, long waitMillis) {
+        if (!handle.isAlive()) {
+            return;
+        }
+        try {
+            handle.onExit().get(waitMillis, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException | TimeoutException ignored) {
+            // Caller escalates to destroyForcibly.
+        }
+    }
+
+    private static void closeQuietly(AutoCloseable closeable) {
+        try {
+            closeable.close();
+        } catch (Exception ignored) {
+            // Process termination is the authoritative cleanup path.
+        }
+    }
+
     private final class StreamingSession implements CodeGraphParserSession {
 
         private final Process process;
@@ -219,7 +300,9 @@ public final class ProcessCodeGraphParser implements CodeGraphParser {
             ensureOpen();
             bindProject(request);
             if (!process.isAlive()) {
-                throw exitException();
+                ProcessParserExitException exception = exitException();
+                failClosed();
+                throw exception;
             }
             try {
                 stdin.write(OBJECT_MAPPER.writeValueAsString(request));
@@ -237,22 +320,29 @@ public final class ProcessCodeGraphParser implements CodeGraphParser {
                 }
                 return decodeDelta(output, request);
             } catch (TimeoutException e) {
-                process.destroyForcibly();
-                throw new ProcessParserTimeoutException(language, command, timeout);
+                ProcessParserTimeoutException exception = new ProcessParserTimeoutException(language, command, timeout);
+                failClosed();
+                throw exception;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                process.destroyForcibly();
-                throw new ProcessParserException("External streaming parser interrupted: language=" + language
+                ProcessParserException exception = new ProcessParserException("External streaming parser interrupted: language=" + language
                     + ", command=" + command, language, command, e);
+                failClosed();
+                throw exception;
             } catch (ExecutionException e) {
-                process.destroyForcibly();
                 Throwable cause = e.getCause() == null ? e : e.getCause();
-                throw new ProcessParserException("External streaming parser IO failed: language=" + language
+                ProcessParserException exception = new ProcessParserException("External streaming parser IO failed: language=" + language
                     + ", command=" + command, language, command, cause);
+                failClosed();
+                throw exception;
             } catch (IOException e) {
-                process.destroyForcibly();
-                throw new ProcessParserException("External streaming parser IO failed: language=" + language
+                ProcessParserException exception = new ProcessParserException("External streaming parser IO failed: language=" + language
                     + ", command=" + command, language, command, e);
+                failClosed();
+                throw exception;
+            } catch (RuntimeException e) {
+                failClosed();
+                throw e;
             }
         }
 
@@ -292,23 +382,41 @@ public final class ProcessCodeGraphParser implements CodeGraphParser {
                 return;
             }
             closed = true;
+            List<ProcessHandle> descendantsAtClose = process.descendants().toList();
             try {
                 stdin.close();
                 long closeTimeout = Math.min(timeout.toMillis(), 5_000);
                 if (!process.waitFor(closeTimeout, TimeUnit.MILLISECONDS)) {
-                    process.destroyForcibly();
-                    process.waitFor(closeTimeout, TimeUnit.MILLISECONDS);
+                    terminateProcessTree(process);
                 }
             } catch (IOException e) {
-                process.destroyForcibly();
+                terminateProcessTree(process);
                 throw new ProcessParserException("Cannot close streaming parser: language=" + language
                     + ", command=" + command, language, command, e);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                process.destroyForcibly();
+                terminateProcessTree(process);
                 throw new ProcessParserException("Interrupted while closing streaming parser: language=" + language
                     + ", command=" + command, language, command, e);
+            } finally {
+                closeQuietly(stdout);
+                descendantsAtClose.stream()
+                    .filter(ProcessHandle::isAlive)
+                    .forEach(ProcessCodeGraphParser::destroyForciblyQuietly);
+                if (process.isAlive()) {
+                    terminateProcessTree(process);
+                }
             }
+        }
+
+        private void failClosed() {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            closeQuietly(stdin);
+            closeQuietly(stdout);
+            terminateProcessTree(process);
         }
     }
 }
