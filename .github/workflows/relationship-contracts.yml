@@ -48,94 +48,94 @@ jobs:
 
     steps:
       - name: Check out Engine
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: workspace/code-graph-engine
 
       - name: Check out parser and extractor sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: praha-poseidon/code-graph-parser-java
           ref: master
           path: workspace/code-graph-parser-java
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/static-extract-java
           ref: main
           path: workspace/static-extract-java
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/static-extract-spec
           ref: main
           path: workspace/static-extract-spec
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/code-graph-parser-go
           ref: main
           path: workspace/code-graph-parser-go
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/static-extract-go
           ref: main
           path: workspace/static-extract-go
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/code-graph-parser-js
           ref: master
           path: workspace/code-graph-parser-js
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/static-extract-js
           ref: main
           path: workspace/static-extract-js
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/code-graph-parser-python
           ref: main
           path: workspace/code-graph-parser-python
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/static-extract-python
           ref: main
           path: workspace/static-extract-python
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/code-graph-parser-php
           ref: main
           path: workspace/code-graph-parser-php
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/static-extract-php
           ref: main
           path: workspace/static-extract-php
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/code-graph-parser-kotlin
           ref: main
           path: workspace/code-graph-parser-kotlin
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/static-extract-kotlin
           ref: main
           path: workspace/static-extract-kotlin
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.23.12'
           cache-dependency-path: workspace/code-graph-parser-go/go.sum
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '24.19.0'
           cache: npm
           cache-dependency-path: |
             workspace/static-extract-js/package-lock.json
             workspace/code-graph-parser-js/package-lock.json
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: pip
@@ -233,20 +233,20 @@ jobs:
 
     steps:
       - name: Check out Engine
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: workspace/code-graph-engine
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/code-graph-parser-swift
           ref: main
           path: workspace/code-graph-parser-swift
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: praha-poseidon/static-extract-swift
           ref: main
           path: workspace/static-extract-swift
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
