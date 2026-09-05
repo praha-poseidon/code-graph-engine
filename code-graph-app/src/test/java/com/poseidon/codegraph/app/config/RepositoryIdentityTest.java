@@ -25,4 +25,10 @@ class RepositoryIdentityTest {
         assertThat(a.graphScope(null)).isEqualTo(a.graphScope(""));
         assertThat(RepositoryIdentity.hash("github.com/a/demo")).hasSize(64);
     }
+    @Test void projectIdIsDeterministicAndFixedLength() {
+        String a = RepositoryIdentity.projectId("github.com/team/demo");
+        assertThat(a).hasSize(26).matches("[A-Z2-7]{26}")
+            .isEqualTo(RepositoryIdentity.projectId("github.com/team/demo"))
+            .isNotEqualTo(RepositoryIdentity.projectId("github.com/other/demo"));
+    }
 }

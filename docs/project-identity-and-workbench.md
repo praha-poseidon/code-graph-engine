@@ -2,10 +2,11 @@
 
 ## Identity contract
 
-`repository_config.id` remains the relational primary key for tasks. The additive
-`repository_identity` table assigns each registered repository a random, persistent
-UUID `projectId`. Updating transport, credentials, display path, or branch does not
-regenerate that UUID. Deleting and recreating a registration creates a new identity.
+`repository_config.id` remains the relational primary key for tasks. The
+`repository_identity` table assigns each canonical repository a deterministic,
+fixed-length 26-character Base32 `projectId` derived from SHA-256. Updating
+transport, credentials, display path, or branch does not change it. The database
+unique constraint remains the collision guard.
 
 The duplicate-registration key is full SHA-256 of canonical Git host + full group
 path + repository name. HTTPS and SSH default transports normalize to the same

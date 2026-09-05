@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS repository_config (
 
 CREATE TABLE IF NOT EXISTS repository_identity (
     repository_id BIGINT PRIMARY KEY,
-    project_id VARCHAR(36) NOT NULL UNIQUE,
+    project_id VARCHAR(26) NOT NULL UNIQUE,
     repository_key VARCHAR(64) NOT NULL UNIQUE,
     canonical_repository VARCHAR(2048) NOT NULL,
     FOREIGN KEY (repository_id) REFERENCES repository_config(id) ON DELETE CASCADE

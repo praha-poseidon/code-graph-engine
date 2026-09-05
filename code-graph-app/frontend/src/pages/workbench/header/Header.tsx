@@ -11,20 +11,20 @@ export default function WorkbenchHeader({ controller }: { controller: WorkbenchC
 
   return (
     <header className="relative z-40 flex h-16 shrink-0 items-center gap-4 border-b border-dashed border-violet-500/20 bg-[#090910] px-5">
-      <div className="flex w-[260px] shrink-0 items-center">
+      <div className="flex w-[220px] shrink-0 items-center">
         <div className="relative w-full">
           <button
             type="button"
             title={controller.selectedGitRepoUrl || undefined}
             onClick={() => setRepoOpen(open => !open)}
-            className="flex h-10 w-full items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.025] px-3 text-left text-xs text-[#9d97b6] transition hover:border-violet-400/30 hover:text-white"
+            className="flex h-11 w-full items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.025] px-3 text-left text-xs text-[#9d97b6] transition hover:border-violet-400/30 hover:text-white"
           >
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
             <span className="min-w-0 flex-1 truncate">{selectedRepoLabel}</span>
             <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition ${repoOpen ? 'rotate-180' : ''}`} />
           </button>
           {repoOpen && (
-            <div className="absolute left-0 top-[calc(100%+8px)] z-50 max-h-60 w-[240px] overflow-y-auto rounded-lg border border-white/10 bg-[#11111d]/96 p-1 shadow-2xl backdrop-blur">
+            <div className="absolute left-0 top-[calc(100%+8px)] z-50 max-h-60 w-[220px] overflow-y-auto rounded-lg border border-white/10 bg-[#11111d]/96 p-1 shadow-2xl backdrop-blur">
               <button
                 type="button"
                 onClick={() => {
@@ -106,10 +106,6 @@ export default function WorkbenchHeader({ controller }: { controller: WorkbenchC
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-3 text-xs text-[#77718f]">
-          <span>{controller.graphData.nodes.length} nodes</span>
-          <span>{controller.graphData.edges.length} edges</span>
-        </div>
         <McpButton />
         <button
           onClick={() => controller.setMode('settings')}

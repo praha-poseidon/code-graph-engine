@@ -170,7 +170,7 @@ public class RepositoryConfigStore {
     private void insertIdentity(RepositoryConfig config) {
         String canonical = RepositoryIdentity.canonical(config.gitRepoUrl());
         jdbc.update("INSERT INTO repository_identity (repository_id, project_id, repository_key, canonical_repository) VALUES (?, ?, ?, ?)",
-            config.id(), java.util.UUID.randomUUID().toString(), RepositoryIdentity.hash(canonical), canonical);
+            config.id(), RepositoryIdentity.projectId(canonical), RepositoryIdentity.hash(canonical), canonical);
     }
 
     public RepositoryIdentity identity(long repositoryId) {

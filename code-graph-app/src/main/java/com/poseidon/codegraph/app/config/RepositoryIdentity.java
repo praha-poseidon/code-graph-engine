@@ -8,6 +8,35 @@ import java.util.Locale;
 
 /** Stable platform identity, separate from the repository's display name and transport. */
 public record RepositoryIdentity(String projectId, String repositoryKey, String canonicalRepository) {
+    /**
+     * Stable, fixed-length identity for a canonical repository. 26 Base32
+     * characters carry 130 bits; the database unique key remains the final
+     * collision guard.
+     */
+    public static String projectId(String canonicalRepository) {
+        byte[] digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256")
+                .digest(canonicalRepository.getBytes(StandardCharsets.UTF_8));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException(exception);
+        }
+        final char[] alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".toCharArray();
+        StringBuilder encoded = new StringBuilder(26);
+        int buffer = 0;
+        int bits = 0;
+        for (byte value : digest) {
+            buffer = (buffer << 8) | (value & 0xff);
+            bits += 8;
+            while (bits >= 5 && encoded.length() < 26) {
+                bits -= 5;
+                encoded.append(alphabet[(buffer >>> bits) & 31]);
+            }
+            if (encoded.length() == 26) break;
+        }
+        return encoded.toString();
+    }
+
     public String graphScope(String branch) {
         // A new task/checkout must not change node IDs; different branches must not overwrite them.
         return "project:" + projectId + ":branch:" + hash(branch == null ? "" : branch.trim());
