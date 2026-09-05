@@ -3,6 +3,7 @@ package com.poseidon.codegraph.app;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.poseidon.codegraph.app.task.AnalysisTaskStore;
+import com.poseidon.codegraph.app.task.AnalysisTaskEventStore;
 import com.poseidon.codegraph.app.task.AnalysisWorkerIdentity;
 import com.poseidon.codegraph.app.task.AnalysisWorkerStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,10 +56,14 @@ class RepositoryConfigApiTest {
     private AnalysisTaskStore taskStore;
 
     @Autowired
+    private AnalysisTaskEventStore taskEventStore;
+
+    @Autowired
     private AnalysisWorkerStore workerStore;
 
     @BeforeEach
     void clearDatabase() {
+        jdbc.update("DELETE FROM analysis_task_event");
         jdbc.update("DELETE FROM analysis_task");
         jdbc.update("DELETE FROM repository_config");
     }
@@ -102,6 +107,9 @@ class RepositoryConfigApiTest {
         assertThat(taskStore.claimNext("api-test", Duration.ofSeconds(30))).isPresent();
         assertThat(taskStore.recoverExpiredLeases()).isZero();
 
+        String cloneEventId = taskEventStore.start(taskId, "CLONE", "正在克隆仓库");
+        taskEventStore.succeed(cloneEventId, "仓库克隆完成");
+
         mockMvc.perform(get("/api/tasks").param("repositoryId", Long.toString(repositoryId)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.length()").value(1))
@@ -110,6 +118,13 @@ class RepositoryConfigApiTest {
         mockMvc.perform(get("/api/tasks"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[0].leaseOwner").value("api-test"));
+
+        mockMvc.perform(get("/api/tasks/{taskId}/events", taskId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(2))
+            .andExpect(jsonPath("$.data[0].stage").value("QUEUED"))
+            .andExpect(jsonPath("$.data[1].stage").value("CLONE"))
+            .andExpect(jsonPath("$.data[1].status").value("SUCCEEDED"));
 
         workerStore.register(new AnalysisWorkerIdentity("api-worker"));
         workerStore.heartbeat("api-worker", taskId);

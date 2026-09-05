@@ -36,6 +36,7 @@ public final class AnalysisTaskWorker {
         ".git", ".idea", ".vscode", "node_modules", "vendor", "target", "build", "dist", ".build");
 
     private final AnalysisTaskStore taskStore;
+    private final AnalysisTaskEventStore taskEventStore;
     private final RepositoryConfigStore repositoryStore;
     private final GitWorkspace workspace;
     private final IncrementalUpdateService incrementalUpdateService;
@@ -50,6 +51,7 @@ public final class AnalysisTaskWorker {
 
     public AnalysisTaskWorker(
             AnalysisTaskStore taskStore,
+            AnalysisTaskEventStore taskEventStore,
             RepositoryConfigStore repositoryStore,
             GitWorkspace workspace,
             IncrementalUpdateService incrementalUpdateService,
@@ -59,6 +61,7 @@ public final class AnalysisTaskWorker {
             @Value("${code-graph.tasks.lease-ms:30000}") long leaseMillis,
             @Value("${code-graph.tasks.retry-delay-ms:5000}") long retryDelayMillis) {
         this.taskStore = taskStore;
+        this.taskEventStore = taskEventStore;
         this.repositoryStore = repositoryStore;
         this.workspace = workspace;
         this.incrementalUpdateService = incrementalUpdateService;
@@ -118,100 +121,236 @@ public final class AnalysisTaskWorker {
     void execute(AnalysisTask task) {
         RepositoryConfig encrypted = repositoryStore.findById(task.repositoryId()).orElse(null);
         if (encrypted == null) {
-            taskStore.failOrRetry(task.id(), identity.workerId(), "仓库不存在",
-                "repositoryId=" + task.repositoryId(), retryDelay);
+            String details = "repositoryId=" + task.repositoryId();
+            TaskFailureDisposition disposition = taskStore.failOrRetry(
+                task.id(), identity.workerId(), "仓库不存在", details, retryDelay);
+            taskEventStore.record(task.id(), "COMPLETE",
+                disposition == TaskFailureDisposition.RETRY_SCHEDULED ? "RETRYING" : "FAILED",
+                disposition == TaskFailureDisposition.RETRY_SCHEDULED ? "仓库不存在，等待重试" : "仓库不存在",
+                details);
             return;
         }
         repositoryStore.updateStatus(encrypted.id(), "ANALYZING", encrypted.lastAnalyzedAt());
         Map<String, IncrementalUpdateSession> sessions = new HashMap<>();
+        RepositoryConfig repository = null;
+        int total = 0;
+        boolean parsed = false;
+        boolean canceled = false;
+        boolean leaseLost = false;
+        Exception failure = null;
+        String activeEventId = null;
         try {
-            RepositoryConfig repository = repositoryStore.decrypted(encrypted);
+            repository = repositoryStore.decrypted(encrypted);
             checkpoint(task.id());
             progress(task.id(), 0, 0, "克隆仓库");
-            Path checkout = workspace.cloneRepository(task.id(), repository);
+            activeEventId = taskEventStore.start(task.id(), "CLONE", "正在克隆仓库");
+            Path checkout;
+            try {
+                checkout = workspace.cloneRepository(task.id(), repository);
+                taskEventStore.succeed(activeEventId, "仓库克隆完成");
+                activeEventId = null;
+            } catch (Exception exception) {
+                taskEventStore.fail(activeEventId, "仓库克隆失败", stackSummary(exception));
+                activeEventId = null;
+                throw exception;
+            }
 
             List<String> classpath = prepareBuild(task.id(), checkout, repository);
-            List<Path> sourceFiles = sourceFiles(checkout, repository.languages());
+            activeEventId = taskEventStore.start(task.id(), "DISCOVER", "正在扫描源码文件");
+            List<Path> sourceFiles;
+            try {
+                sourceFiles = sourceFiles(checkout, repository.languages());
+                taskEventStore.succeed(activeEventId, "发现 " + sourceFiles.size() + " 个源码文件");
+                activeEventId = null;
+            } catch (Exception exception) {
+                taskEventStore.fail(activeEventId, "扫描源码文件失败", stackSummary(exception));
+                activeEventId = null;
+                throw exception;
+            }
             if (sourceFiles.isEmpty()) {
                 throw new IllegalStateException("仓库中没有找到所选语言的源码文件");
             }
 
-            int total = sourceFiles.size();
+            total = sourceFiles.size();
             progress(task.id(), 0, total, "开始解析 " + total + " 个文件");
             String[] sourceRoots = sourceRoots(checkout);
             String[] dependencies = classpath.toArray(String[]::new);
+            for (String language : sourceFiles.stream().map(AnalysisTaskWorker::languageFor).distinct().toList()) {
+                session(task.id(), language, sessions);
+            }
             int current = 0;
-            for (Path file : sourceFiles) {
-                checkpoint(task.id());
-                String projectFilePath = checkout.relativize(file).toString().replace('\\', '/');
-                String language = languageFor(file);
-                IncrementalUpdateSession session = sessions.computeIfAbsent(
-                    language, incrementalUpdateService::openSession);
-                session.handleFileAdded(
-                    repository.name(),
-                    file.toAbsolutePath().normalize().toString(),
-                    projectFilePath,
-                    repository.gitRepoUrl(),
-                    repository.gitBranch(),
-                    dependencies,
-                    sourceRoots,
-                    repository.endpointRuleSources(),
-                    List.of());
-                current++;
-                progress(task.id(), current, total, "正在解析 " + projectFilePath);
+            activeEventId = taskEventStore.start(task.id(), "PARSE", "开始解析 " + total + " 个文件");
+            try {
+                for (Path file : sourceFiles) {
+                    checkpoint(task.id());
+                    String projectFilePath = checkout.relativize(file).toString().replace('\\', '/');
+                    String language = languageFor(file);
+                    IncrementalUpdateSession session = sessions.get(language);
+                    session.handleFileAdded(
+                        repository.name(),
+                        file.toAbsolutePath().normalize().toString(),
+                        projectFilePath,
+                        repository.gitRepoUrl(),
+                        repository.gitBranch(),
+                        dependencies,
+                        sourceRoots,
+                        repository.endpointRuleSources(),
+                        List.of());
+                    current++;
+                    String message = "正在解析 " + projectFilePath;
+                    progress(task.id(), current, total, message);
+                    taskEventStore.update(activeEventId, current + "/" + total + " · " + projectFilePath);
+                }
+                taskEventStore.succeed(activeEventId, "已解析 " + total + " 个文件");
+                activeEventId = null;
+                parsed = true;
+            } catch (TaskCanceledException exception) {
+                taskEventStore.cancel(activeEventId, "解析已取消");
+                activeEventId = null;
+                throw exception;
+            } catch (Exception exception) {
+                taskEventStore.fail(activeEventId, "解析失败", stackSummary(exception));
+                activeEventId = null;
+                throw exception;
             }
-
-            checkpoint(task.id());
-            if (!taskStore.succeed(task.id(), identity.workerId(), total)) {
-                throw new TaskLeaseLostException(task.id());
-            }
-            repositoryStore.updateStatus(repository.id(), "DONE", Instant.now());
         } catch (TaskCanceledException exception) {
-            taskStore.markCanceled(task.id(), identity.workerId(), "任务已取消");
-            repositoryStore.updateStatus(encrypted.id(), "IDLE", encrypted.lastAnalyzedAt());
+            canceled = true;
         } catch (TaskLeaseLostException exception) {
-            log.warn("停止已丢失租约的分析任务: taskId={}, workerId={}", task.id(), identity.workerId());
+            leaseLost = true;
         } catch (Exception exception) {
-            log.error("异步分析任务失败: taskId={}, repositoryId={}", task.id(), task.repositoryId(), exception);
-            String message = rootMessage(exception);
+            failure = exception;
+        } finally {
+            if (activeEventId != null) {
+                taskEventStore.fail(activeEventId, "阶段未完成", failure == null ? null : stackSummary(failure));
+            }
+            closeSessions(task.id(), sessions);
+            cleanupWorkspace(task.id());
+        }
+
+        if (leaseLost) {
+            log.warn("停止已丢失租约的分析任务: taskId={}, workerId={}", task.id(), identity.workerId());
+            taskEventStore.record(task.id(), "COMPLETE", "RETRYING", "Worker 租约已丢失，等待任务恢复", null);
+            return;
+        }
+        if (canceled) {
+            taskStore.markCanceled(task.id(), identity.workerId(), "任务已取消");
+            taskEventStore.record(task.id(), "COMPLETE", "CANCELED", "任务已取消", null);
+            repositoryStore.updateStatus(encrypted.id(), "IDLE", encrypted.lastAnalyzedAt());
+            return;
+        }
+        if (failure != null) {
+            log.error("异步分析任务失败: taskId={}, repositoryId={}", task.id(), task.repositoryId(), failure);
+            String message = rootMessage(failure);
             TaskFailureDisposition disposition = taskStore.failOrRetry(
-                task.id(), identity.workerId(), message, stackSummary(exception), retryDelay);
-            workerStore.recordError(identity.workerId(), stackSummary(exception));
+                task.id(), identity.workerId(), message, stackSummary(failure), retryDelay);
+            workerStore.recordError(identity.workerId(), stackSummary(failure));
+            taskEventStore.record(task.id(), "COMPLETE",
+                disposition == TaskFailureDisposition.RETRY_SCHEDULED ? "RETRYING" : "FAILED",
+                disposition == TaskFailureDisposition.RETRY_SCHEDULED ? "本次执行失败，等待重试" : "任务失败",
+                stackSummary(failure));
             if (disposition == TaskFailureDisposition.FAILED) {
                 repositoryStore.updateStatus(encrypted.id(), "FAILED", encrypted.lastAnalyzedAt());
             } else if (disposition == TaskFailureDisposition.CANCELED) {
                 repositoryStore.updateStatus(encrypted.id(), "IDLE", encrypted.lastAnalyzedAt());
             }
-        } finally {
-            sessions.values().forEach(session -> {
-                try {
-                    session.close();
-                } catch (Exception exception) {
-                    log.warn("关闭 parser session 失败: taskId={}, language={}", task.id(), session.language(), exception);
+            return;
+        }
+        if (parsed && repository != null) {
+            try {
+                checkpoint(task.id());
+                if (!taskStore.succeed(task.id(), identity.workerId(), total)) {
+                    throw new TaskLeaseLostException(task.id());
                 }
-            });
-            workspace.cleanup(task.id());
+                taskEventStore.record(task.id(), "COMPLETE", "SUCCEEDED", "任务完成", null);
+                repositoryStore.updateStatus(repository.id(), "DONE", Instant.now());
+            } catch (TaskCanceledException exception) {
+                taskStore.markCanceled(task.id(), identity.workerId(), "任务已取消");
+                taskEventStore.record(task.id(), "COMPLETE", "CANCELED", "任务已取消", null);
+                repositoryStore.updateStatus(encrypted.id(), "IDLE", encrypted.lastAnalyzedAt());
+            } catch (TaskLeaseLostException exception) {
+                log.warn("完成任务前丢失租约: taskId={}, workerId={}", task.id(), identity.workerId());
+            }
         }
     }
 
     private List<String> prepareBuild(String taskId, Path checkout, RepositoryConfig repository) {
         if (!autoBuild || repository.languages().stream().noneMatch(language ->
                 "java".equals(language) || "kotlin".equals(language))) {
+            taskEventStore.skip(taskId, "BUILD", "当前语言无需预构建");
             return existingClasspath(checkout);
         }
+        String eventId;
         if (Files.exists(checkout.resolve("pom.xml"))) {
             progress(taskId, 0, 0, "执行 Maven 构建并解析依赖");
+            eventId = taskEventStore.start(taskId, "BUILD", "正在执行 Maven 构建并解析依赖");
             String executable = Files.isRegularFile(checkout.resolve("mvnw")) ? "./mvnw" : "mvn";
-            workspace.run(List.of(executable, "-q", "-DskipTests", "package",
-                "dependency:build-classpath", "-Dmdep.outputFile=.codegraph-classpath"),
-                checkout, Map.of(), Duration.ofMinutes(15));
+            try {
+                workspace.run(List.of(executable, "-q", "-DskipTests", "package",
+                    "dependency:build-classpath", "-Dmdep.outputFile=.codegraph-classpath"),
+                    checkout, Map.of(), Duration.ofMinutes(15));
+                taskEventStore.succeed(eventId, "Maven 构建完成");
+            } catch (Exception exception) {
+                taskEventStore.fail(eventId, "Maven 构建失败", stackSummary(exception));
+                throw exception;
+            }
         } else if (Files.exists(checkout.resolve("build.gradle")) || Files.exists(checkout.resolve("build.gradle.kts"))) {
             progress(taskId, 0, 0, "执行 Gradle 构建");
+            eventId = taskEventStore.start(taskId, "BUILD", "正在执行 Gradle 构建");
             String executable = Files.isRegularFile(checkout.resolve("gradlew")) ? "./gradlew" : "gradle";
-            workspace.run(List.of(executable, "classes", "--no-daemon"),
-                checkout, Map.of(), Duration.ofMinutes(15));
+            try {
+                workspace.run(List.of(executable, "classes", "--no-daemon"),
+                    checkout, Map.of(), Duration.ofMinutes(15));
+                taskEventStore.succeed(eventId, "Gradle 构建完成");
+            } catch (Exception exception) {
+                taskEventStore.fail(eventId, "Gradle 构建失败", stackSummary(exception));
+                throw exception;
+            }
+        } else {
+            taskEventStore.skip(taskId, "BUILD", "未检测到 Maven 或 Gradle 构建文件");
         }
         return existingClasspath(checkout);
+    }
+
+    private IncrementalUpdateSession session(
+            String taskId,
+            String language,
+            Map<String, IncrementalUpdateSession> sessions) {
+        IncrementalUpdateSession existing = sessions.get(language);
+        if (existing != null) return existing;
+        String eventId = taskEventStore.start(taskId, "SESSION_START", "正在创建 " + language + " Parser Session");
+        try {
+            IncrementalUpdateSession created = incrementalUpdateService.openSession(language);
+            sessions.put(language, created);
+            taskEventStore.succeed(eventId, language + " Parser Session 已创建");
+            return created;
+        } catch (Exception exception) {
+            taskEventStore.fail(eventId, language + " Parser Session 创建失败", stackSummary(exception));
+            throw exception;
+        }
+    }
+
+    private void closeSessions(String taskId, Map<String, IncrementalUpdateSession> sessions) {
+        sessions.forEach((language, session) -> {
+            String eventId = taskEventStore.start(taskId, "SESSION_CLOSE", "正在关闭 " + language + " Parser Session");
+            try {
+                session.close();
+                taskEventStore.succeed(eventId, language + " Parser Session 已关闭");
+            } catch (Exception exception) {
+                taskEventStore.fail(eventId, language + " Parser Session 关闭失败", stackSummary(exception));
+                log.warn("关闭 parser session 失败: taskId={}, language={}", taskId, language, exception);
+            }
+        });
+    }
+
+    private void cleanupWorkspace(String taskId) {
+        String eventId = taskEventStore.start(taskId, "CLEANUP", "正在清理临时工作目录");
+        try {
+            workspace.cleanup(taskId);
+            taskEventStore.succeed(eventId, "临时工作目录已清理");
+        } catch (Exception exception) {
+            taskEventStore.fail(eventId, "临时工作目录清理失败", stackSummary(exception));
+            log.warn("清理任务工作目录失败: taskId={}", taskId, exception);
+        }
     }
 
     private void progress(String taskId, int current, int total, String message) {

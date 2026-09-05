@@ -48,6 +48,7 @@ class AnalysisTaskWorkerTest {
     @Test
     void parserFailureStillClosesTaskSessionAndCleansWorkspace() throws Exception {
         AnalysisTaskStore taskStore = mock(AnalysisTaskStore.class);
+        AnalysisTaskEventStore taskEventStore = mock(AnalysisTaskEventStore.class);
         RepositoryConfigStore repositoryStore = mock(RepositoryConfigStore.class);
         GitWorkspace workspace = mock(GitWorkspace.class);
         IncrementalUpdateService updateService = mock(IncrementalUpdateService.class);
@@ -72,7 +73,7 @@ class AnalysisTaskWorkerTest {
                 anyString(), anyString(), anyString(), anyString(), anyString(),
                 any(String[].class), any(String[].class), anyList(), anyList());
 
-        new AnalysisTaskWorker(taskStore, repositoryStore, workspace, updateService,
+        new AnalysisTaskWorker(taskStore, taskEventStore, repositoryStore, workspace, updateService,
             workerStore, identity, false, 30000, 0).execute(task);
 
         verify(session).close();
@@ -84,6 +85,7 @@ class AnalysisTaskWorkerTest {
     @Test
     void sessionCloseFailureCannotPreventWorkspaceCleanup() throws Exception {
         AnalysisTaskStore taskStore = mock(AnalysisTaskStore.class);
+        AnalysisTaskEventStore taskEventStore = mock(AnalysisTaskEventStore.class);
         RepositoryConfigStore repositoryStore = mock(RepositoryConfigStore.class);
         GitWorkspace workspace = mock(GitWorkspace.class);
         IncrementalUpdateService updateService = mock(IncrementalUpdateService.class);
@@ -107,7 +109,7 @@ class AnalysisTaskWorkerTest {
         when(session.language()).thenReturn("go");
         doThrow(new IllegalStateException("close failed")).when(session).close();
 
-        new AnalysisTaskWorker(taskStore, repositoryStore, workspace, updateService,
+        new AnalysisTaskWorker(taskStore, taskEventStore, repositoryStore, workspace, updateService,
             workerStore, identity, false, 30000, 0).execute(task);
 
         verify(session).close();
@@ -118,6 +120,7 @@ class AnalysisTaskWorkerTest {
     @Test
     void filesOfOneLanguageReuseOneTaskSessionAndAreProcessedSequentially() throws Exception {
         AnalysisTaskStore taskStore = mock(AnalysisTaskStore.class);
+        AnalysisTaskEventStore taskEventStore = mock(AnalysisTaskEventStore.class);
         RepositoryConfigStore repositoryStore = mock(RepositoryConfigStore.class);
         GitWorkspace workspace = mock(GitWorkspace.class);
         IncrementalUpdateService updateService = mock(IncrementalUpdateService.class);
@@ -140,7 +143,7 @@ class AnalysisTaskWorkerTest {
             .thenReturn(true);
         when(taskStore.succeed("task-3", "worker-test", 2)).thenReturn(true);
 
-        new AnalysisTaskWorker(taskStore, repositoryStore, workspace, updateService,
+        new AnalysisTaskWorker(taskStore, taskEventStore, repositoryStore, workspace, updateService,
             workerStore, identity, false, 30000, 0).execute(task);
 
         verify(updateService, times(1)).openSession("go");

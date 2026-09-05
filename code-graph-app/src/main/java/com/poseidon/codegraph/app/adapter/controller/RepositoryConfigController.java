@@ -7,6 +7,8 @@ import com.poseidon.codegraph.app.config.RepositoryConfigStore;
 import com.poseidon.codegraph.app.config.RepositoryRequest;
 import com.poseidon.codegraph.app.config.RepositoryView;
 import com.poseidon.codegraph.app.task.AnalysisTask;
+import com.poseidon.codegraph.app.task.AnalysisTaskEvent;
+import com.poseidon.codegraph.app.task.AnalysisTaskEventStore;
 import com.poseidon.codegraph.app.task.AnalysisTaskStore;
 import com.poseidon.codegraph.app.task.AnalysisWorker;
 import com.poseidon.codegraph.app.task.AnalysisWorkerStore;
@@ -31,16 +33,19 @@ public class RepositoryConfigController {
 
     private final RepositoryConfigStore repositoryStore;
     private final AnalysisTaskStore taskStore;
+    private final AnalysisTaskEventStore taskEventStore;
     private final AnalysisWorkerStore workerStore;
     private final EndpointRuleArchiveReader endpointRuleArchiveReader;
 
     public RepositoryConfigController(
             RepositoryConfigStore repositoryStore,
             AnalysisTaskStore taskStore,
+            AnalysisTaskEventStore taskEventStore,
             AnalysisWorkerStore workerStore,
             EndpointRuleArchiveReader endpointRuleArchiveReader) {
         this.repositoryStore = repositoryStore;
         this.taskStore = taskStore;
+        this.taskEventStore = taskEventStore;
         this.workerStore = workerStore;
         this.endpointRuleArchiveReader = endpointRuleArchiveReader;
     }
@@ -111,6 +116,14 @@ public class RepositoryConfigController {
         return taskStore.findById(taskId)
             .map(ApiResponse::success)
             .orElseGet(() -> ApiResponse.error(404, "任务不存在"));
+    }
+
+    @GetMapping("/tasks/{taskId}/events")
+    public ApiResponse<List<AnalysisTaskEvent>> taskEvents(@PathVariable String taskId) {
+        if (taskStore.findById(taskId).isEmpty()) {
+            return ApiResponse.error(404, "任务不存在");
+        }
+        return ApiResponse.success(taskEventStore.findByTaskId(taskId));
     }
 
     @PostMapping("/tasks/{taskId}/cancel")

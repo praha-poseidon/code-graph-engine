@@ -4,8 +4,9 @@ import {
   Clock3, Loader2, RefreshCw, RotateCcw, TimerReset,
 } from 'lucide-react'
 import {
-  cancelAnalysisTask, fetchRepositoryOptions, fetchTasks,
-  type AnalysisTask, type AnalysisTaskStatus, type RepositoryOption,
+  cancelAnalysisTask, fetchRepositoryOptions, fetchTaskEvents, fetchTasks,
+  type AnalysisTask, type AnalysisTaskEvent, type AnalysisTaskEventStatus,
+  type AnalysisTaskStatus, type RepositoryOption,
 } from '../../api/analysisApi'
 import { cn } from '../../lib/utils'
 
@@ -22,6 +23,21 @@ const statusFilters: Array<['ALL' | AnalysisTaskStatus, string]> = [
   ['SUCCEEDED', '已完成'], ['FAILED', '失败'], ['CANCELED', '已取消'],
 ]
 
+const eventStatusMeta: Record<AnalysisTaskEventStatus, { label: string; dot: string; text: string }> = {
+  RUNNING: { label: '进行中', dot: 'bg-violet-400 animate-pulse', text: 'text-violet-200' },
+  SUCCEEDED: { label: '完成', dot: 'bg-emerald-400', text: 'text-emerald-300' },
+  FAILED: { label: '失败', dot: 'bg-rose-400', text: 'text-rose-300' },
+  SKIPPED: { label: '跳过', dot: 'bg-[#69637c]', text: 'text-[#8f88a8]' },
+  CANCELED: { label: '取消', dot: 'bg-amber-400', text: 'text-amber-300' },
+  RETRYING: { label: '重试', dot: 'bg-amber-400', text: 'text-amber-300' },
+}
+
+const stageLabels: Record<string, string> = {
+  QUEUED: '进入队列', CLONE: '克隆仓库', BUILD: '构建项目', DISCOVER: '扫描源码',
+  SESSION_START: '创建 Session', PARSE: '解析源码',
+  SESSION_CLOSE: '关闭 Session', CLEANUP: '清理现场', COMPLETE: '任务结束',
+}
+
 export default function TaskCenterPage({ repositoryId, onRepositoryChange }: {
   repositoryId: number | null
   onRepositoryChange: (repositoryId: number | null) => void
@@ -33,6 +49,8 @@ export default function TaskCenterPage({ repositoryId, onRepositoryChange }: {
   const [refreshing, setRefreshing] = useState(false)
   const [canceling, setCanceling] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [events, setEvents] = useState<AnalysisTaskEvent[]>([])
+  const [eventsLoading, setEventsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async (initial = false) => {
@@ -62,6 +80,28 @@ export default function TaskCenterPage({ repositoryId, onRepositoryChange }: {
       window.clearInterval(refreshTimer)
     }
   }, [load])
+
+  useEffect(() => {
+    if (!expanded) return
+    let active = true
+    const loadEvents = async (initial = false) => {
+      if (initial) setEventsLoading(true)
+      try {
+        const nextEvents = await fetchTaskEvents(expanded)
+        if (active) setEvents(nextEvents)
+      } catch (cause) {
+        if (active) setError(cause instanceof Error ? cause.message : '任务明细加载失败')
+      } finally {
+        if (active && initial) setEventsLoading(false)
+      }
+    }
+    void loadEvents(true)
+    const timer = window.setInterval(() => void loadEvents(false), 2500)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [expanded])
 
   const visibleTasks = useMemo(
     () => status === 'ALL' ? tasks : tasks.filter(task => task.status === status),
@@ -170,13 +210,29 @@ export default function TaskCenterPage({ repositoryId, onRepositoryChange }: {
                         {canceling === task.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}取消
                       </button>
                     )}
-                    <button onClick={() => setExpanded(open ? null : task.id)} title="任务详情" className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 transition hover:bg-ink-50 hover:text-ink-800">
+                    <button onClick={() => {
+                      setEvents([])
+                      setEventsLoading(!open)
+                      setExpanded(open ? null : task.id)
+                    }} title="任务详情" className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 transition hover:bg-ink-50 hover:text-ink-800">
                       {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </button>
                   </div>
                 </div>
                 {open && (
                   <div className="grid gap-4 border-t border-ink-100 bg-white/[0.015] px-5 py-4 text-xs md:grid-cols-2 xl:grid-cols-4">
+                    <div className="md:col-span-2 xl:col-span-4">
+                      <p className="mb-3 text-[10px] uppercase tracking-wide text-ink-400">执行明细</p>
+                      {eventsLoading ? (
+                        <div className="flex items-center gap-2 py-3 text-ink-400"><Loader2 className="h-3.5 w-3.5 animate-spin" />正在加载</div>
+                      ) : events.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-ink-200 px-3 py-4 text-center text-ink-400">该任务还没有执行步骤</div>
+                      ) : (
+                        <div className="space-y-0">
+                          {events.map((event, index) => <TaskEventRow key={event.id} event={event} last={index === events.length - 1} />)}
+                        </div>
+                      )}
+                    </div>
                     <Detail label="创建时间" value={formatTime(task.createdAt)} />
                     <Detail label="开始时间" value={formatTime(task.startedAt)} />
                     <Detail label="完成时间" value={formatTime(task.finishedAt)} />
@@ -202,6 +258,29 @@ export default function TaskCenterPage({ repositoryId, onRepositoryChange }: {
   )
 }
 
+function TaskEventRow({ event, last }: { event: AnalysisTaskEvent; last: boolean }) {
+  const meta = eventStatusMeta[event.status] ?? eventStatusMeta.RUNNING
+  return (
+    <div className="grid grid-cols-[18px_minmax(0,1fr)_auto] gap-x-3">
+      <div className="flex flex-col items-center">
+        <span className={cn('mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-4 ring-[#10111b]', meta.dot)} />
+        {!last && <span className="min-h-7 w-px flex-1 bg-white/[0.09]" />}
+      </div>
+      <div className={cn('min-w-0 pb-4', last && 'pb-0')}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium text-ink-800">{stageLabels[event.stage] ?? event.stage}</span>
+          <span className={cn('text-[10px]', meta.text)}>{meta.label}</span>
+        </div>
+        <p className="mt-0.5 break-all text-[11px] leading-5 text-ink-500">{event.message || '—'}</p>
+        {event.details && <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap rounded-md bg-rose-400/[0.06] p-2 font-mono text-[10px] leading-4 text-rose-200">{event.details}</pre>}
+      </div>
+      <div className="whitespace-nowrap pt-0.5 text-[10px] text-ink-400" title={formatTime(event.startedAt)}>
+        {eventDuration(event)}
+      </div>
+    </div>
+  )
+}
+
 function Metric({ label, value, tone }: { label: string; value: number; tone: string }) {
   return <div className="rounded-xl border border-ink-200 bg-white px-4 py-3"><p className="text-xs text-ink-400">{label}</p><p className={cn('mt-1 text-xl font-semibold', tone)}>{value}</p></div>
 }
@@ -222,4 +301,15 @@ function formatTime(value?: string | null) {
   if (!value) return '—'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+}
+
+function eventDuration(event: AnalysisTaskEvent) {
+  if (!event.finishedAt) return '进行中'
+  const start = new Date(event.startedAt).getTime()
+  const finish = new Date(event.finishedAt).getTime()
+  if (Number.isNaN(start) || Number.isNaN(finish)) return '—'
+  const milliseconds = Math.max(0, finish - start)
+  if (milliseconds < 1000) return `${milliseconds} ms`
+  if (milliseconds < 60_000) return `${(milliseconds / 1000).toFixed(1)} 秒`
+  return `${Math.floor(milliseconds / 60_000)} 分 ${Math.round(milliseconds % 60_000 / 1000)} 秒`
 }

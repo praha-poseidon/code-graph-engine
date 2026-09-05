@@ -42,6 +42,21 @@ public final class AnalysisTaskSchema {
                 last_error TEXT
             )
             """);
+        jdbc.execute("""
+            CREATE TABLE IF NOT EXISTS analysis_task_event (
+                id VARCHAR(36) PRIMARY KEY,
+                task_id VARCHAR(36) NOT NULL,
+                stage VARCHAR(64) NOT NULL,
+                status VARCHAR(32) NOT NULL,
+                message VARCHAR(1024),
+                details TEXT,
+                started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                finished_at TIMESTAMP NULL,
+                INDEX idx_analysis_task_event_task_started (task_id, started_at),
+                CONSTRAINT fk_analysis_task_event_task
+                    FOREIGN KEY (task_id) REFERENCES analysis_task(id) ON DELETE CASCADE
+            )
+            """);
     }
 
     private static void addColumn(JdbcTemplate jdbc, Set<String> columns, String name, String definition) {

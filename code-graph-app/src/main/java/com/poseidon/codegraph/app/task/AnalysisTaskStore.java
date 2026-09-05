@@ -16,6 +16,7 @@ import java.util.UUID;
 public class AnalysisTaskStore {
 
     private final JdbcTemplate jdbc;
+    private final AnalysisTaskEventStore eventStore;
     private final int defaultMaxAttempts;
     private final RowMapper<AnalysisTask> rowMapper = (rs, rowNum) -> new AnalysisTask(
         rs.getString("id"), rs.getLong("repository_id"), rs.getString("status"),
@@ -31,8 +32,10 @@ public class AnalysisTaskStore {
     public AnalysisTaskStore(
             JdbcTemplate jdbc,
             AnalysisTaskSchema ignoredSchemaDependency,
+            AnalysisTaskEventStore eventStore,
             @Value("${code-graph.tasks.max-attempts:3}") int defaultMaxAttempts) {
         this.jdbc = jdbc;
+        this.eventStore = eventStore;
         this.defaultMaxAttempts = Math.max(1, defaultMaxAttempts);
     }
 
@@ -42,6 +45,7 @@ public class AnalysisTaskStore {
             INSERT INTO analysis_task (id, repository_id, status, message, max_attempts, updated_at)
             VALUES (?, ?, 'QUEUED', '等待执行', ?, CURRENT_TIMESTAMP)
             """, id, repositoryId, defaultMaxAttempts);
+        eventStore.record(id, "QUEUED", "SUCCEEDED", "任务已进入队列", null);
         return findById(id).orElseThrow();
     }
 
@@ -202,8 +206,11 @@ public class AnalysisTaskStore {
             UPDATE analysis_task
                SET status = 'CANCELED', cancel_requested = TRUE, message = '任务已取消',
                    finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-             WHERE id = ? AND status = 'QUEUED'
+            WHERE id = ? AND status = 'QUEUED'
             """, id);
+        if (queued == 1) {
+            eventStore.record(id, "COMPLETE", "CANCELED", "任务已取消", null);
+        }
         if (queued == 0) {
             jdbc.update("""
                 UPDATE analysis_task

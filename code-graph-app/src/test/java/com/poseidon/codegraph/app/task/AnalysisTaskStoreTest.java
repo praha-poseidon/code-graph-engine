@@ -37,8 +37,12 @@ class AnalysisTaskStoreTest {
     @Autowired
     private AnalysisWorkerStore workerStore;
 
+    @Autowired
+    private AnalysisTaskEventStore eventStore;
+
     @BeforeEach
     void setUp() {
+        jdbc.update("DELETE FROM analysis_task_event");
         jdbc.update("DELETE FROM analysis_worker");
         jdbc.update("DELETE FROM analysis_task");
         jdbc.update("DELETE FROM repository_config");
@@ -135,6 +139,40 @@ class AnalysisTaskStoreTest {
 
         workerStore.markOffline(identity.workerId());
         assertThat(workerStore.findAll().getFirst().status()).isEqualTo("OFFLINE");
+    }
+
+    @Test
+    void taskEventsPreserveStageHistoryAndDurationBoundaries() {
+        AnalysisTask task = store.enqueue(1L);
+        String cloneEvent = eventStore.start(task.id(), "CLONE", "正在克隆仓库");
+        eventStore.succeed(cloneEvent, "仓库克隆完成");
+        eventStore.skip(task.id(), "BUILD", "当前语言无需预构建");
+        String parseEvent = eventStore.start(task.id(), "PARSE", "开始解析");
+        eventStore.update(parseEvent, "1/2 · main.go");
+
+        var events = eventStore.findByTaskId(task.id());
+        assertThat(events).hasSize(4);
+        assertThat(events.get(0).stage()).isEqualTo("QUEUED");
+        assertThat(events.get(1).stage()).isEqualTo("CLONE");
+        assertThat(events.get(1).status()).isEqualTo("SUCCEEDED");
+        assertThat(events.get(1).finishedAt()).isNotNull();
+        assertThat(events.get(2).status()).isEqualTo("SKIPPED");
+        assertThat(events.get(3).status()).isEqualTo("RUNNING");
+        assertThat(events.get(3).message()).isEqualTo("1/2 · main.go");
+        assertThat(events.get(3).finishedAt()).isNull();
+    }
+
+    @Test
+    void queuedCancellationIsVisibleInTaskHistory() {
+        AnalysisTask task = store.enqueue(1L);
+
+        assertThat(store.cancel(task.id()).orElseThrow().status()).isEqualTo("CANCELED");
+
+        var events = eventStore.findByTaskId(task.id());
+        assertThat(events).hasSize(2);
+        assertThat(events.get(0).stage()).isEqualTo("QUEUED");
+        assertThat(events.get(1).stage()).isEqualTo("COMPLETE");
+        assertThat(events.get(1).status()).isEqualTo("CANCELED");
     }
 
     private void expire(String taskId) {
