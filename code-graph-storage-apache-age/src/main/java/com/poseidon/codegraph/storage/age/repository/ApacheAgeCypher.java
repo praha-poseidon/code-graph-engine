@@ -27,7 +27,7 @@ public class ApacheAgeCypher {
     @jakarta.annotation.PostConstruct
     public void init() {
         setup();
-        if (initializeGraph) {
+        if (initializeGraph && !graphExists()) {
             jdbcTemplate.execute("SELECT create_graph('" + escapeSql(graphName) + "')");
         }
     }
@@ -70,6 +70,14 @@ public class ApacheAgeCypher {
         jdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS age");
         jdbcTemplate.execute("LOAD 'age'");
         jdbcTemplate.execute("SET search_path = ag_catalog, \"$user\", public");
+    }
+
+    private boolean graphExists() {
+        Boolean exists = jdbcTemplate.queryForObject(
+            "SELECT EXISTS (SELECT 1 FROM ag_catalog.ag_graph WHERE name = ?)",
+            Boolean.class,
+            graphName);
+        return Boolean.TRUE.equals(exists);
     }
 
     private String quoteKey(String key) {

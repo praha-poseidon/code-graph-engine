@@ -52,7 +52,6 @@ public final class AnalysisTaskSchema {
                 details TEXT,
                 started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 finished_at TIMESTAMP NULL,
-                INDEX idx_analysis_task_event_task_started (task_id, started_at),
                 CONSTRAINT fk_analysis_task_event_task
                     FOREIGN KEY (task_id) REFERENCES analysis_task(id) ON DELETE CASCADE
             )

@@ -1,6 +1,7 @@
 package com.poseidon.codegraph.storage.age.repository;
 
 import com.poseidon.codegraph.engine.application.model.CodeRelationshipDO;
+import com.poseidon.codegraph.engine.application.model.CodeUnitDO;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -41,6 +42,29 @@ class ApacheAgeCodeGraphRepositoryTest {
                 .contains("from.projectName = 'demo'")
                 .contains("to.projectName = 'demo'")
                 .contains("r.projectName = 'demo'"));
+    }
+
+    @Test
+    void nodeMergeIncludesProjectScopeInIdentity() {
+        CapturingAgeCypher age = new CapturingAgeCypher();
+        ApacheAgeCodeGraphRepository repository = new ApacheAgeCodeGraphRepository(age);
+
+        CodeUnitDO unit = new CodeUnitDO();
+        unit.setId("shared-id");
+        unit.setName("Service");
+        unit.setQualifiedName("demo.Service");
+        unit.setLanguage("java");
+        unit.setProjectName("project-a");
+        unit.setProjectFilePath("src/Service.java");
+        unit.setUnitType("class");
+        unit.setPackageId("demo");
+
+        repository.insertUnitsBatch(List.of(unit));
+
+        assertThat(age.executed())
+            .singleElement()
+            .satisfies(cypher -> assertThat(cypher)
+                .contains("MERGE (n:CodeUnit {id: 'shared-id', projectName: 'project-a'})"));
     }
 
     private CodeRelationshipDO relationship() {

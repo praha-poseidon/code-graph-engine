@@ -274,11 +274,15 @@ public class ApacheAgeCodeGraphRepository implements
     }
 
     private void mergeNode(String label, String id, Map<String, ?> props) {
+        Object projectName = props.get("projectName");
+        String identity = projectName == null
+            ? "id: " + age.value(id)
+            : "id: " + age.value(id) + ", projectName: " + age.value(projectName);
         age.execute("""
-            MERGE (n:%s {id: %s})
+            MERGE (n:%s {%s})
             SET n += %s
             RETURN n
-            """.formatted(label, age.value(id), age.props(props)));
+            """.formatted(label, identity, age.props(props)));
     }
 
     private void mergeRelationship(CodeRelationshipDO relationship) {
