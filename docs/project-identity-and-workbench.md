@@ -33,7 +33,8 @@ Historical short-name identities are not supported. There is no startup backfill
 legacy identity field, display-name fallback, or migration notice. Registrations
 must have an identity created with the current registration flow. Missing identity
 rows are rejected, never silently mapped to a display name. Removing compatibility
-code does not delete existing database records or task history.
+code does not delete existing database records or task history. Existing legacy
+registrations are outside this identity contract and are not migrated.
 
 The development application currently uses an in-memory graph backend. SQL task
 history survives restarts; graph data requires an export before a development
