@@ -127,5 +127,12 @@ class RepositoryConfigApiTest {
 
         assertThat(jdbc.queryForObject(
             "SELECT access_token FROM repository_config WHERE id = ?", String.class, repositoryId)).isNull();
+
+        String canceledTaskId = taskStore.enqueue(repositoryId).id();
+        mockMvc.perform(post("/api/tasks/{taskId}/cancel", canceledTaskId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.status").value("CANCELED"))
+            .andExpect(jsonPath("$.data.cancelRequested").value(true));
     }
 }

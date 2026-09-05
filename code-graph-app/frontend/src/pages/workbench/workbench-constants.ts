@@ -2,7 +2,7 @@ import type { ElementType } from 'react'
 import { Box, Braces, Code2, Folder } from 'lucide-react'
 
 export type WorkbenchMode = 'graph' | 'settings'
-export type SettingsTab = 'projects'
+export type SettingsTab = 'projects' | 'tasks' | 'workers'
 
 export interface GraphMetadata {
   gitRepoUrls: string[]

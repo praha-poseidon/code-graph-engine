@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle, CheckCircle2, Clock, FolderGit2, KeyRound, Loader2,
-  Pencil, Play, Plus, Trash2, X, XCircle,
+  ListTodo, Pencil, Play, Plus, Trash2, X, XCircle,
 } from 'lucide-react'
 import { apiGet, apiPost, request } from '../../lib/http'
 import { cn } from '../../lib/utils'
@@ -60,7 +60,7 @@ const emptyForm: FormState = {
 
 const RULE_SEPARATOR = '\n\n--- codegraph-rule ---\n\n'
 
-export default function ProjectsPage() {
+export default function ProjectsPage({ onOpenTasks }: { onOpenTasks?: (repositoryId: number) => void }) {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -69,7 +69,7 @@ export default function ProjectsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const load = async (initial = false) => {
+  const load = useCallback(async (initial = false) => {
     if (initial) setLoading(true)
     try {
       const response = await apiGet<{ code: number; message: string; data: Project[] }>('/api/config/projects')
@@ -80,13 +80,16 @@ export default function ProjectsPage() {
     } finally {
       if (initial) setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    load(true)
-    const timer = window.setInterval(() => load(false), 2500)
-    return () => window.clearInterval(timer)
-  }, [])
+    const initialTimer = window.setTimeout(() => void load(true), 0)
+    const refreshTimer = window.setInterval(() => void load(false), 2500)
+    return () => {
+      window.clearTimeout(initialTimer)
+      window.clearInterval(refreshTimer)
+    }
+  }, [load])
 
   const openCreate = () => {
     setEditing(null)
@@ -203,7 +206,7 @@ export default function ProjectsPage() {
         </button>
       ) : (
         <div className="space-y-3">
-          {projects.map(project => <RepositoryCard key={project.id} project={project} onAnalyze={handleAnalyze} onEdit={openEdit} onDelete={handleDelete} />)}
+          {projects.map(project => <RepositoryCard key={project.id} project={project} onAnalyze={handleAnalyze} onEdit={openEdit} onDelete={handleDelete} onOpenTasks={onOpenTasks} />)}
         </div>
       )}
 
@@ -282,11 +285,12 @@ export default function ProjectsPage() {
   )
 }
 
-function RepositoryCard({ project, onAnalyze, onEdit, onDelete }: {
+function RepositoryCard({ project, onAnalyze, onEdit, onDelete, onOpenTasks }: {
   project: Project
   onAnalyze: (project: Project) => void
   onEdit: (project: Project) => void
   onDelete: (project: Project) => void
+  onOpenTasks?: (repositoryId: number) => void
 }) {
   const config = statusConfig[project.status]
   const StatusIcon = config.icon
@@ -319,6 +323,7 @@ function RepositoryCard({ project, onAnalyze, onEdit, onDelete }: {
           {project.status === 'failed' && project.statusMessage && <p className="mt-2 text-xs text-red-500">{project.statusMessage}</p>}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {onOpenTasks && <button onClick={() => onOpenTasks(project.id)} title="查看任务" className="grid h-8 w-8 place-items-center rounded-lg text-violet-300 hover:bg-violet-500/10"><ListTodo className="h-4 w-4" /></button>}
           <button onClick={() => onAnalyze(project)} disabled={project.status === 'analyzing'} title="开始分析" className="grid h-8 w-8 place-items-center rounded-lg text-emerald-600 hover:bg-emerald-50 disabled:opacity-40"><Play className="h-4 w-4" /></button>
           <button onClick={() => onEdit(project)} title="编辑" className="grid h-8 w-8 place-items-center rounded-lg text-ink-500 hover:bg-ink-50"><Pencil className="h-4 w-4" /></button>
           <button onClick={() => onDelete(project)} title="删除" className="grid h-8 w-8 place-items-center rounded-lg text-red-500 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
