@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle, CheckCircle2, CircleHelp, Clock, Download, FileArchive, FolderGit2, KeyRound, Loader2,
-  ListTodo, Pencil, Play, Plus, Trash2, UploadCloud, X, XCircle,
+  ListTodo, Pencil, Play, Plus, Trash2, UploadCloud, X, XCircle, Copy, Check,
 } from 'lucide-react'
 import { apiGet, apiPost, request } from '../../lib/http'
 import { cn } from '../../lib/utils'
@@ -392,9 +392,9 @@ function RepositoryCard({ project, onAnalyze, onEdit, onDelete, onOpenTasks }: {
           <p className="mt-1 truncate font-mono text-xs text-ink-400">{project.gitRepoUrl}</p>
           {project.projectId && <details className="mt-2 text-[11px] text-ink-400">
             <summary className="cursor-pointer">项目标识</summary>
-            <p className="mt-1 break-all font-mono">{project.projectId}</p>
+            <CompactIdentifier value={project.projectId} />
             <p className="mt-1 break-all">{project.canonicalRepository}</p>
-            <p className="mt-1 break-all font-mono">{project.graphScope}</p>
+            {project.graphScope && <CompactIdentifier value={project.graphScope} />}
           </details>}
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-400">
             <span>分支：{project.gitBranch || '默认分支'}</span>
@@ -418,6 +418,31 @@ function RepositoryCard({ project, onAnalyze, onEdit, onDelete, onOpenTasks }: {
         </div>
       </div>
     </article>
+  )
+}
+
+function CompactIdentifier({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+  const compact = value.length > 24 ? `${value.slice(0, 10)}…${value.slice(-10)}` : value
+  return (
+    <button
+      type="button"
+      title={`${value}（点击复制）`}
+      aria-label={`复制完整标识 ${value}`}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value)
+          setCopied(true)
+          window.setTimeout(() => setCopied(false), 1600)
+        } catch {
+          setCopied(false)
+        }
+      }}
+      className="mt-1 flex max-w-full items-center gap-1 text-left font-mono text-[11px] text-ink-500 hover:text-brand-600"
+    >
+      <span className="truncate">{compact}</span>
+      {copied ? <Check className="h-3 w-3 shrink-0 text-emerald-600" /> : <Copy className="h-3 w-3 shrink-0" />}
+    </button>
   )
 }
 
