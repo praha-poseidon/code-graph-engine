@@ -85,12 +85,12 @@ class JavaProcessParserEndToEndTest {
     }
 
     @Test
-    void registeredProjectAndBranchScopesKeepRealSourceRelationshipsIsolated() throws Exception {
+    void registeredProjectScopesKeepRealSourceRelationshipsIsolated() throws Exception {
         var a = new com.poseidon.codegraph.app.config.RepositoryIdentity("a", "key-a", "github.com/team-a/demo");
         var b = new com.poseidon.codegraph.app.config.RepositoryIdentity("b", "key-b", "github.com/team-b/demo");
         var repository = new InMemoryCodeGraphRepository();
         var service = new IncrementalUpdateService(repository, repository, repository, repository, repository);
-        var scopes = List.of(a.graphScope("main"), a.graphScope("feature"), b.graphScope("main"));
+        var scopes = List.of(a.graphScope(), b.graphScope());
         Oracle oracle = MAPPER.readValue(fixtureRoot().resolve("source-oracle.json").toFile(), Oracle.class);
         for (String scope : scopes) persistFixture(service, scope);
         for (String scope : scopes) {

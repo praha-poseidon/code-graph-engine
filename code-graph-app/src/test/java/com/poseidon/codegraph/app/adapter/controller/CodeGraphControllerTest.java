@@ -47,7 +47,7 @@ class CodeGraphControllerTest {
         assertThat(controller.createFileNodes(request).getCode()).isEqualTo(200);
         assertThat(controller.updateFileNodes(request).getCode()).isEqualTo(200);
         assertThat(controller.deleteFileNodes(request).getCode()).isEqualTo(200);
-        String scope = identity.graphScope("main");
+        String scope = identity.graphScope();
         verify(service).handleFileAdded(eq(scope), any(), any(), eq("https://github.com/team/demo.git"), eq("main"), any(), any(), any(), any());
         verify(service).handleFileModified(eq(scope), any(), any(), eq("https://github.com/team/demo.git"), eq("main"), any(), any(), any(), any());
         verify(service).handleFileDeleted(eq(scope), any(), any(), eq("https://github.com/team/demo.git"), eq("main"), any(), any());

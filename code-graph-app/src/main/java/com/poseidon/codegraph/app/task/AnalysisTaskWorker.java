@@ -141,7 +141,7 @@ public final class AnalysisTaskWorker {
         String activeEventId = null;
         try {
             repository = repositoryStore.decrypted(encrypted);
-            String graphScope = repositoryStore.identity(repository.id()).graphScope(repository.gitBranch());
+            String graphScope = repositoryStore.identity(repository.id()).graphScope();
             checkpoint(task.id());
             progress(task.id(), 0, 0, "克隆仓库");
             activeEventId = taskEventStore.start(task.id(), "CLONE", "正在克隆仓库");

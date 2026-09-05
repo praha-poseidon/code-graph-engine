@@ -35,7 +35,7 @@ public class GraphMcpTools {
                     var identity = projects.identity(project.id());
                     return Map.of("repositoryId", project.id(), "name", project.name(),
                         "projectId", identity.projectId(), "branch", project.gitBranch(),
-                        "graphScope", identity.graphScope(project.gitBranch()));
+                        "graphScope", identity.graphScope());
                 }).toList())),
             tool("get_file_nodes", "Read persisted functions, types and endpoints for a repository-relative source file. Does not parse or build.",
                 Map.of("repositoryId", integer(), "path", string()), List.of("repositoryId", "path"), args -> {
@@ -93,7 +93,7 @@ public class GraphMcpTools {
     private String scope(Map<String, Object> args) {
         int id = exactInteger(args.get("repositoryId"), "repositoryId");
         var project = projects.findById(id).orElseThrow(() -> new IllegalArgumentException("Repository not found"));
-        return projects.identity(id).graphScope(project.gitBranch());
+        return projects.identity(id).graphScope();
     }
 
     private static int exactInteger(Object value, String key) {

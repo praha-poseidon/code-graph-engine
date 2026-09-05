@@ -37,9 +37,9 @@ public record RepositoryIdentity(String projectId, String repositoryKey, String 
         return encoded.toString();
     }
 
-    public String graphScope(String branch) {
-        // A new task/checkout must not change node IDs; different branches must not overwrite them.
-        return "project:" + projectId + ":branch:" + hash(branch == null ? "" : branch.trim());
+    public String graphScope() {
+        // A new task/checkout or selected branch must not change node IDs.
+        return "project:" + projectId;
     }
 
     public static String canonical(String address) {

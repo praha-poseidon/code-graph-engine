@@ -29,7 +29,7 @@ class GraphMcpIntegrationTest {
     @Test void realClientInitializesDiscoversAndReadsOnlySelectedProject() {
         var project = projects.create(new RepositoryRequest("https://github.com/mcp-tests/demo.git", "main",
             List.of("java"), "NONE", null, null, null, List.of(), false));
-        String scope = projects.identity(project.id()).graphScope("main");
+        String scope = projects.identity(project.id()).graphScope();
         var function = new CodeFunctionDO();
         function.setId(scope + "::fn:save"); function.setName("save"); function.setProjectName(scope);
         function.setProjectFilePath("src/Service.java"); function.setLanguage("java");

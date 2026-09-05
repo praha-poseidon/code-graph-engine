@@ -15,11 +15,10 @@ paths are lowercased. Credential-bearing HTTP URLs are rejected. Credentials nev
 participate in keys or node details. This is single-platform identity isolation,
 not a multi-tenant authorization implementation.
 
-Graph scope is `project:<UUID>:branch:<SHA-256(branch)>`. It is independent of task
-ID and clone directory. Empty branch represents the configured default-branch
-slot; explicit `main` is a separate slot. The worker passes this opaque scope to
-all language parsers through the existing projectName contract. Core library
-callers must likewise pass a stable scope, not a display name.
+Graph scope is `project:<26-character-projectId>`. It is independent of task,
+branch, and clone directory. The worker passes this opaque scope to all language
+parsers through the existing projectName contract. Core library callers must
+likewise pass a stable scope, not a display name.
 
 Registered REST file operations can pass `repositoryId` and optionally
 `gitBranch`; the server resolves the same scope for POST, PUT and DELETE
@@ -59,6 +58,6 @@ parser/storage DTO cannot be reconstructed by the UI.
 Tests cover canonical aliases, same-name repositories in different groups,
 transactional duplicate rollback, stable IDs after edits, rejection of missing identities,
 registered file-operation scopes, and stored-node property readback. The real Java
-CLI fixture exercises independent project/branch scopes, repeat application and
+CLI fixture exercises independent project scopes, repeat application and
 deletion isolation through Engine memory storage. Other language CLIs and production
 graph database tests remain separately gated by their runtime/environment variables.

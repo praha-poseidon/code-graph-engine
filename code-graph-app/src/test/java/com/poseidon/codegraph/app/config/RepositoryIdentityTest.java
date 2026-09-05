@@ -16,13 +16,11 @@ class RepositoryIdentityTest {
         assertThatThrownBy(() -> RepositoryIdentity.canonical("https://token@github.com/a/demo.git"))
             .isInstanceOf(IllegalArgumentException.class);
     }
-    @Test void scopeIsStableAcrossTasksAndDifferentAcrossBranchesAndProjects() {
+    @Test void scopeIsStableAcrossTasksAndBranchesAndDifferentAcrossProjects() {
         var a = new RepositoryIdentity("uuid-a", "key", "github.com/a/demo");
         var b = new RepositoryIdentity("uuid-b", "key2", "github.com/b/demo");
-        assertThat(a.graphScope("main")).isEqualTo(a.graphScope("main"))
-            .isNotEqualTo(a.graphScope("feature"))
-            .isNotEqualTo(b.graphScope("main"));
-        assertThat(a.graphScope(null)).isEqualTo(a.graphScope(""));
+        assertThat(a.graphScope()).isEqualTo(a.graphScope())
+            .isNotEqualTo(b.graphScope());
         assertThat(RepositoryIdentity.hash("github.com/a/demo")).hasSize(64);
     }
     @Test void projectIdIsDeterministicAndFixedLength() {

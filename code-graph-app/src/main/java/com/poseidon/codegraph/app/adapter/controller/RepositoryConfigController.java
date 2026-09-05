@@ -157,7 +157,7 @@ public class RepositoryConfigController {
             latest == null ? null : latest.message(),
             repository.lastAnalyzedAt(),
             latest == null ? null : latest.id(),
-            identity.projectId(), identity.canonicalRepository(), identity.graphScope(repository.gitBranch()));
+            identity.projectId(), identity.canonicalRepository(), identity.graphScope());
     }
 
     private String status(String repositoryStatus, AnalysisTask latest) {

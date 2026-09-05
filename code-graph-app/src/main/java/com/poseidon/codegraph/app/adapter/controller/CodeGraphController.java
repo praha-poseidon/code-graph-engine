@@ -189,7 +189,7 @@ public class CodeGraphController {
         var repository = repositoryStore.findById(request.getRepositoryId())
             .orElseThrow(() -> new IllegalArgumentException("仓库不存在"));
         String branch = request.getGitBranch() == null ? repository.gitBranch() : request.getGitBranch();
-        request.setProjectName(repositoryStore.identity(repository.id()).graphScope(branch));
+        request.setProjectName(repositoryStore.identity(repository.id()).graphScope());
         request.setGitRepoUrl(repository.gitRepoUrl());
         request.setGitBranch(branch);
     }
