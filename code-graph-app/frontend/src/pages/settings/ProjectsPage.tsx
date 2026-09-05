@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  AlertCircle, CheckCircle2, CircleHelp, Clock, FileArchive, FolderGit2, KeyRound, Loader2,
+  AlertCircle, CheckCircle2, CircleHelp, Clock, Download, FileArchive, FolderGit2, KeyRound, Loader2,
   ListTodo, Pencil, Play, Plus, Trash2, UploadCloud, X, XCircle,
 } from 'lucide-react'
 import { apiGet, apiPost, request } from '../../lib/http'
@@ -28,6 +28,24 @@ const LANGUAGES = [
   ['java', 'Java'], ['go', 'Go'], ['javascript', 'JavaScript'], ['typescript', 'TypeScript'],
   ['python', 'Python'], ['php', 'PHP'], ['kotlin', 'Kotlin'], ['swift', 'Swift'],
 ] as const
+
+type LanguageToolPackage = {
+  languageLabel: string
+  cli: string
+  skill: string
+  downloadUrl: string
+}
+
+const LANGUAGE_TOOL_PACKAGES: Record<string, LanguageToolPackage> = {
+  java: toolPackage('Java', 'java', 'endpoint-rule-author-java'),
+  go: toolPackage('Go', 'go', 'endpoint-rule-author-go'),
+  javascript: toolPackage('JavaScript', 'js', 'endpoint-rule-author-js'),
+  typescript: toolPackage('TypeScript', 'js', 'endpoint-rule-author-js'),
+  python: toolPackage('Python', 'python', 'endpoint-rule-author-python'),
+  php: toolPackage('PHP', 'php', 'endpoint-rule-author-php'),
+  kotlin: toolPackage('Kotlin', 'kotlin', 'endpoint-rule-author-kotlin'),
+  swift: toolPackage('Swift', 'swift', 'endpoint-rule-author-swift'),
+}
 
 const statusConfig = {
   idle: { label: '待分析', icon: Clock, color: 'text-ink-500 bg-ink-100' },
@@ -164,6 +182,7 @@ export default function ProjectsPage({ onOpenTasks }: { onOpenTasks?: (repositor
     running: projects.filter(project => project.status === 'analyzing').length,
     failed: projects.filter(project => project.status === 'failed').length,
   }), [projects])
+  const selectedTool = LANGUAGE_TOOL_PACKAGES[form.language]
 
   return (
     <div className="w-full space-y-6 px-6 py-7 animate-fadeIn">
@@ -281,11 +300,28 @@ export default function ProjectsPage({ onOpenTasks }: { onOpenTasks?: (repositor
                       <strong className="block font-medium text-ink-900">它是做什么的？</strong>
                       <span className="mt-1 block">告诉解析器哪些代码调用属于 HTTP、RPC、数据库或消息队列端点，并生成统一端点标识，用来连接完整调用链。</span>
                       <strong className="mt-2 block font-medium text-ink-900">怎么使用？</strong>
-                      <span className="mt-1 block">使用当前语言对应的 CLI + Skill 编写并验证 .ser 规则，导出 ZIP 后上传。ZIP 内只需放 UTF-8 编码的 .ser 文件。</span>
+                      <span className="mt-1 block">下载当前所选语言对应的工具包，解压后使用其中的 CLI + Skill 编写并验证 .ser 规则，导出 ZIP 后上传。ZIP 内只需放 UTF-8 编码的 .ser 文件。</span>
                     </span>
                   </span>
                 </span>
               )}>
+                {selectedTool && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-400/20 bg-violet-500/[0.05] px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-ink-800">{selectedTool.languageLabel} 端点规则工具包</p>
+                      <p className="mt-1 text-[11px] text-ink-400">
+                        仅包含 <code className="text-violet-200">{selectedTool.cli}</code> CLI、运行环境和 <code className="text-violet-200">{selectedTool.skill}</code> Skill
+                      </p>
+                    </div>
+                    <a
+                      href={selectedTool.downloadUrl}
+                      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-xs font-medium text-violet-200 transition hover:bg-violet-500/20"
+                      download
+                    >
+                      <Download className="h-3.5 w-3.5" /> 下载 Linux x64 包
+                    </a>
+                  </div>
+                )}
                 <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-ink-200 px-4 py-4 transition hover:border-violet-400/50 hover:bg-violet-500/[0.04]">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-200"><UploadCloud className="h-5 w-5" /></span>
                   <span className="min-w-0 flex-1">
@@ -411,6 +447,16 @@ function formatBytes(size: number) {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+function toolPackage(languageLabel: string, packageLanguage: string, skill: string): LanguageToolPackage {
+  const cli = `extract-${packageLanguage}`
+  return {
+    languageLabel,
+    cli,
+    skill,
+    downloadUrl: `https://github.com/praha-poseidon/static-extract-${packageLanguage}/releases/latest/download/${cli}-linux-x64.tar.gz`,
+  }
 }
 
 function input() {
