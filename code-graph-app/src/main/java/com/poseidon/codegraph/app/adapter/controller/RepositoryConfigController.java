@@ -1,6 +1,7 @@
 package com.poseidon.codegraph.app.adapter.controller;
 
 import com.poseidon.codegraph.app.adapter.dto.ApiResponse;
+import com.poseidon.codegraph.app.config.EndpointRuleArchiveReader;
 import com.poseidon.codegraph.app.config.RepositoryConfig;
 import com.poseidon.codegraph.app.config.RepositoryConfigStore;
 import com.poseidon.codegraph.app.config.RepositoryRequest;
@@ -10,15 +11,17 @@ import com.poseidon.codegraph.app.task.AnalysisTaskStore;
 import com.poseidon.codegraph.app.task.AnalysisWorker;
 import com.poseidon.codegraph.app.task.AnalysisWorkerStore;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -29,14 +32,17 @@ public class RepositoryConfigController {
     private final RepositoryConfigStore repositoryStore;
     private final AnalysisTaskStore taskStore;
     private final AnalysisWorkerStore workerStore;
+    private final EndpointRuleArchiveReader endpointRuleArchiveReader;
 
     public RepositoryConfigController(
             RepositoryConfigStore repositoryStore,
             AnalysisTaskStore taskStore,
-            AnalysisWorkerStore workerStore) {
+            AnalysisWorkerStore workerStore,
+            EndpointRuleArchiveReader endpointRuleArchiveReader) {
         this.repositoryStore = repositoryStore;
         this.taskStore = taskStore;
         this.workerStore = workerStore;
+        this.endpointRuleArchiveReader = endpointRuleArchiveReader;
     }
 
     @GetMapping("/config/projects")
@@ -44,10 +50,13 @@ public class RepositoryConfigController {
         return ApiResponse.success(repositoryStore.findAll().stream().map(this::view).toList());
     }
 
-    @PostMapping("/config/projects")
-    public ApiResponse<RepositoryView> create(@RequestBody RepositoryRequest request) {
+    @PostMapping(value = "/config/projects", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<RepositoryView> create(
+            @RequestPart("config") RepositoryRequest request,
+            @RequestPart(value = "endpointRules", required = false) MultipartFile endpointRules) {
         try {
-            return ApiResponse.success("仓库添加成功", view(repositoryStore.create(request)));
+            RepositoryRequest resolved = request.withEndpointRuleSources(endpointRuleArchiveReader.read(endpointRules));
+            return ApiResponse.success("仓库添加成功", view(repositoryStore.create(resolved)));
         } catch (DuplicateKeyException exception) {
             return ApiResponse.error(409, "该仓库已经存在");
         } catch (RuntimeException exception) {
@@ -55,10 +64,18 @@ public class RepositoryConfigController {
         }
     }
 
-    @PutMapping("/config/projects/{id}")
-    public ApiResponse<RepositoryView> update(@PathVariable long id, @RequestBody RepositoryRequest request) {
+    @PutMapping(value = "/config/projects/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<RepositoryView> update(
+            @PathVariable long id,
+            @RequestPart("config") RepositoryRequest request,
+            @RequestPart(value = "endpointRules", required = false) MultipartFile endpointRules) {
         try {
-            return ApiResponse.success("仓库更新成功", view(repositoryStore.update(id, request)));
+            RepositoryConfig existing = repositoryStore.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("仓库不存在: " + id));
+            List<String> sources = endpointRules != null && !endpointRules.isEmpty()
+                ? endpointRuleArchiveReader.read(endpointRules)
+                : request.clearEndpointRules() ? List.of() : existing.endpointRuleSources();
+            return ApiResponse.success("仓库更新成功", view(repositoryStore.update(id, request.withEndpointRuleSources(sources))));
         } catch (DuplicateKeyException exception) {
             return ApiResponse.error(409, "该仓库已经存在");
         } catch (RuntimeException exception) {
@@ -119,7 +136,7 @@ public class RepositoryConfigController {
             repository.authType(),
             repository.accessToken() != null && !repository.accessToken().isBlank(),
             repository.sshPrivateKey() != null && !repository.sshPrivateKey().isBlank(),
-            repository.endpointRuleSources(),
+            repository.endpointRuleSources().size(),
             status(repository.status(), latest),
             latest == null ? 0 : latest.progressCurrent(),
             latest == null ? 0 : latest.progressTotal(),

@@ -27,6 +27,8 @@ import static org.mockito.Mockito.when;
 
 class AnalysisTaskWorkerTest {
 
+    private static final String ENDPOINT_RULE = "rule http { match GET build path /users }";
+
     @TempDir
     Path tempDir;
 
@@ -144,7 +146,7 @@ class AnalysisTaskWorkerTest {
         verify(updateService, times(1)).openSession("go");
         verify(session, times(2)).handleFileAdded(
             anyString(), anyString(), anyString(), anyString(), anyString(),
-            any(String[].class), any(String[].class), anyList(), anyList());
+            any(String[].class), any(String[].class), eq(List.of(ENDPOINT_RULE)), eq(List.of()));
         verify(session).close();
         verify(taskStore).succeed("task-3", "worker-test", 2);
     }
@@ -168,7 +170,7 @@ class AnalysisTaskWorkerTest {
             null,
             null,
             null,
-            List.of(),
+            List.of(ENDPOINT_RULE),
             "IDLE",
             null,
             Instant.now(),

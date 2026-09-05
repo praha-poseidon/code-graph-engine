@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  AlertCircle, CheckCircle2, Clock, FolderGit2, KeyRound, Loader2,
-  ListTodo, Pencil, Play, Plus, Trash2, X, XCircle,
+  AlertCircle, CheckCircle2, Clock, FileArchive, FolderGit2, KeyRound, Loader2,
+  ListTodo, Pencil, Play, Plus, Trash2, UploadCloud, X, XCircle,
 } from 'lucide-react'
 import { apiGet, apiPost, request } from '../../lib/http'
 import { cn } from '../../lib/utils'
@@ -15,7 +15,7 @@ interface Project {
   authType: 'NONE' | 'SSH' | 'ACCESS_TOKEN'
   hasAccessToken: boolean
   hasSshPrivateKey: boolean
-  endpointRuleSources: string[]
+  endpointRuleCount: number
   status: 'idle' | 'analyzing' | 'done' | 'failed'
   progressCurrent: number
   progressTotal: number
@@ -39,26 +39,26 @@ const statusConfig = {
 type FormState = {
   gitRepoUrl: string
   gitBranch: string
-  languages: string[]
+  language: string
   authType: 'NONE' | 'SSH' | 'ACCESS_TOKEN'
   accessToken: string
   sshPrivateKey: string
   sshPassphrase: string
-  endpointRules: string
+  endpointRulesArchive: File | null
+  clearEndpointRules: boolean
 }
 
 const emptyForm: FormState = {
   gitRepoUrl: '',
   gitBranch: '',
-  languages: ['java'],
+  language: 'java',
   authType: 'NONE',
   accessToken: '',
   sshPrivateKey: '',
   sshPassphrase: '',
-  endpointRules: '',
+  endpointRulesArchive: null,
+  clearEndpointRules: false,
 }
-
-const RULE_SEPARATOR = '\n\n--- codegraph-rule ---\n\n'
 
 export default function ProjectsPage({ onOpenTasks }: { onOpenTasks?: (repositoryId: number) => void }) {
   const [projects, setProjects] = useState<Project[]>([])
@@ -103,41 +103,34 @@ export default function ProjectsPage({ onOpenTasks }: { onOpenTasks?: (repositor
     setForm({
       gitRepoUrl: project.gitRepoUrl,
       gitBranch: project.gitBranch,
-      languages: project.languages,
+      language: project.languages[0] ?? 'java',
       authType: project.authType,
       accessToken: '',
       sshPrivateKey: '',
       sshPassphrase: '',
-      endpointRules: project.endpointRuleSources.join(RULE_SEPARATOR),
+      endpointRulesArchive: null,
+      clearEndpointRules: false,
     })
     setError(null)
     setShowForm(true)
   }
 
-  const toggleLanguage = (language: string) => {
-    setForm(current => ({
-      ...current,
-      languages: current.languages.includes(language)
-        ? current.languages.filter(value => value !== language)
-        : [...current.languages, language],
-    }))
-  }
-
   const handleSave = async () => {
     if (!form.gitRepoUrl.trim()) return setError('仓库地址必填')
-    if (form.languages.length === 0) return setError('至少选择一种语言')
-    const body = {
+    if (!form.language) return setError('请选择源码语言')
+    const config = {
       gitRepoUrl: form.gitRepoUrl,
       gitBranch: form.gitBranch,
-      languages: form.languages,
+      languages: [form.language],
       authType: form.authType,
       accessToken: form.accessToken,
       sshPrivateKey: form.sshPrivateKey,
       sshPassphrase: form.sshPassphrase,
-      endpointRuleSources: form.endpointRules.trim()
-        ? form.endpointRules.split(RULE_SEPARATOR).map(rule => rule.trim()).filter(Boolean)
-        : [],
+      clearEndpointRules: form.clearEndpointRules,
     }
+    const body = new FormData()
+    body.append('config', new Blob([JSON.stringify(config)], { type: 'application/json' }))
+    if (form.endpointRulesArchive) body.append('endpointRules', form.endpointRulesArchive)
     setSaving(true)
     setError(null)
     try {
@@ -233,10 +226,10 @@ export default function ProjectsPage({ onOpenTasks }: { onOpenTasks?: (repositor
               <Field label="源码语言 *">
                 <div className="flex flex-wrap gap-2">
                   {LANGUAGES.map(([value, label]) => (
-                    <button key={value} type="button" onClick={() => toggleLanguage(value)} className={cn(
+                    <button key={value} type="button" className={cn(
                       'rounded-lg border px-3 py-2 text-xs font-medium transition',
-                      form.languages.includes(value) ? 'border-violet-400/60 bg-violet-500/15 text-violet-200' : 'border-ink-200 text-ink-500 hover:border-violet-400/30 hover:text-ink-800',
-                    )}>{label}</button>
+                      form.language === value ? 'border-violet-400/60 bg-violet-500/15 text-violet-200' : 'border-ink-200 text-ink-500 hover:border-violet-400/30 hover:text-ink-800',
+                    )} aria-pressed={form.language === value} onClick={() => setForm(current => ({ ...current, language: value }))}>{label}</button>
                   ))}
                 </div>
               </Field>
@@ -268,8 +261,44 @@ export default function ProjectsPage({ onOpenTasks }: { onOpenTasks?: (repositor
                 </div>
               )}
 
-              <Field label="端点规则（可选）">
-                <textarea value={form.endpointRules} onChange={event => setForm(current => ({ ...current, endpointRules: event.target.value }))} rows={8} placeholder="直接粘贴 SER/EPR 规则；多条规则使用 --- codegraph-rule --- 分隔" className={cn(input(), 'resize-y font-mono text-xs')} />
+              <Field label="端点规则包（可选）">
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-ink-200 px-4 py-4 transition hover:border-violet-400/50 hover:bg-violet-500/[0.04]">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-200"><UploadCloud className="h-5 w-5" /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-ink-700">上传 ZIP 规则包</span>
+                    <span className="mt-0.5 block text-xs text-ink-400">使用所选语言的 CLI + Skill 生成，包内放置 .ser 规则文件</span>
+                  </span>
+                  <input
+                    type="file"
+                    accept=".zip,application/zip,application/x-zip-compressed"
+                    className="hidden"
+                    onChange={event => {
+                      const archive = event.target.files?.[0] ?? null
+                      setForm(current => ({ ...current, endpointRulesArchive: archive, clearEndpointRules: false }))
+                      event.target.value = ''
+                    }}
+                  />
+                </label>
+                {form.endpointRulesArchive && (
+                  <RuleArchiveStatus
+                    label={form.endpointRulesArchive.name}
+                    detail={`${formatBytes(form.endpointRulesArchive.size)} · 保存后替换当前规则包`}
+                    onRemove={() => setForm(current => ({ ...current, endpointRulesArchive: null }))}
+                  />
+                )}
+                {!form.endpointRulesArchive && editing && editing.endpointRuleCount > 0 && !form.clearEndpointRules && (
+                  <RuleArchiveStatus
+                    label="已上传规则包"
+                    detail={`${editing.endpointRuleCount} 个 .ser 规则文件`}
+                    onRemove={() => setForm(current => ({ ...current, clearEndpointRules: true }))}
+                  />
+                )}
+                {editing && form.clearEndpointRules && (
+                  <div className="flex items-center justify-between rounded-lg border border-rose-400/20 bg-rose-400/[0.05] px-3 py-2 text-xs text-rose-200">
+                    <span>保存后将移除现有规则包</span>
+                    <button type="button" onClick={() => setForm(current => ({ ...current, clearEndpointRules: false }))} className="text-ink-400 hover:text-white">撤销</button>
+                  </div>
+                )}
               </Field>
             </div>
             <div className="flex justify-end gap-2 border-t border-ink-100 px-6 py-4">
@@ -311,7 +340,7 @@ function RepositoryCard({ project, onAnalyze, onEdit, onDelete, onOpenTasks }: {
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-400">
             <span>分支：{project.gitBranch || '默认分支'}</span>
             <span>认证：{project.authType === 'NONE' ? '公开仓库' : project.authType}</span>
-            <span>端点规则：{project.endpointRuleSources.length}</span>
+            <span>端点规则：{project.endpointRuleCount}</span>
             {project.lastAnalyzedAt && <span>完成时间：{new Date(project.lastAnalyzedAt).toLocaleString()}</span>}
           </div>
           {project.status === 'analyzing' && (
@@ -339,6 +368,25 @@ function Metric({ label, value, accent }: { label: string; value: number; accent
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-1.5"><label className="text-xs font-medium text-ink-600">{label}</label>{children}</div>
+}
+
+function RuleArchiveStatus({ label, detail, onRemove }: { label: string; detail: string; onRemove: () => void }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-ink-200 bg-white/[0.02] px-3 py-2.5">
+      <FileArchive className="h-4 w-4 shrink-0 text-violet-200" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-medium text-ink-700">{label}</p>
+        <p className="mt-0.5 text-[11px] text-ink-400">{detail}</p>
+      </div>
+      <button type="button" onClick={onRemove} className="grid h-7 w-7 place-items-center rounded-lg text-ink-400 hover:bg-rose-400/10 hover:text-rose-300" title="移除规则包"><X className="h-3.5 w-3.5" /></button>
+    </div>
+  )
+}
+
+function formatBytes(size: number) {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
 function input() {

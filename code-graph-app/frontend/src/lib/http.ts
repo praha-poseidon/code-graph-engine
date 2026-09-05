@@ -15,17 +15,18 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
 
 export const request = async <T>(url: string, options: RequestOptions = {}): Promise<T> => {
   const { body, headers, ...rest } = options
+  const multipart = body instanceof FormData
   const init: RequestInit = {
     credentials: 'include',
     headers: {
       Accept: 'application/json',
-      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(body !== undefined && !multipart ? { 'Content-Type': 'application/json' } : {}),
       ...(headers as Record<string, string> | undefined),
     },
     ...rest,
   }
   if (body !== undefined) {
-    init.body = typeof body === 'string' ? body : JSON.stringify(body)
+    init.body = multipart ? body : typeof body === 'string' ? body : JSON.stringify(body)
   }
 
   const res = await fetch(url, init)

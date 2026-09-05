@@ -12,7 +12,7 @@ public record RepositoryView(
         String authType,
         boolean hasAccessToken,
         boolean hasSshPrivateKey,
-        List<String> endpointRuleSources,
+        int endpointRuleCount,
         String status,
         int progressCurrent,
         int progressTotal,

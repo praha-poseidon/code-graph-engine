@@ -10,5 +10,12 @@ public record RepositoryRequest(
         String accessToken,
         String sshPrivateKey,
         String sshPassphrase,
-        List<String> endpointRuleSources) {
+        List<String> endpointRuleSources,
+        boolean clearEndpointRules) {
+
+    public RepositoryRequest withEndpointRuleSources(List<String> sources) {
+        return new RepositoryRequest(
+            gitRepoUrl, gitBranch, languages, authType, accessToken,
+            sshPrivateKey, sshPassphrase, sources, clearEndpointRules);
+    }
 }

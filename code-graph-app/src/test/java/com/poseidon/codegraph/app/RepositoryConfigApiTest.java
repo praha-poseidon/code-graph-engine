@@ -14,15 +14,20 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.time.Duration;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -60,21 +65,25 @@ class RepositoryConfigApiTest {
 
     @Test
     void repositoryConfigurationAndAnalysisTaskArePersisted() throws Exception {
-        String createResponse = mockMvc.perform(post("/api/config/projects")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(Map.of(
+        String createResponse = mockMvc.perform(multipart("/api/config/projects")
+                .file(configPart(Map.of(
                     "gitRepoUrl", "https://github.com/example/payment-service.git",
                     "gitBranch", "main",
-                    "languages", List.of("java", "go"),
+                    "languages", List.of("java"),
                     "authType", "ACCESS_TOKEN",
                     "accessToken", "plain-token",
-                    "endpointRuleSources", List.of("HTTP GET /payments")
+                    "clearEndpointRules", false
+                )))
+                .file(rulesArchive(Map.of(
+                    "rules/http.ser", "rule http { match GET build path /payments }",
+                    "rules/redis.ser", "rule redis { match DEL build key payments }"
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.name").value("payment-service"))
             .andExpect(jsonPath("$.data.languages[0]").value("java"))
             .andExpect(jsonPath("$.data.hasAccessToken").value(true))
+            .andExpect(jsonPath("$.data.endpointRuleCount").value(2))
             .andReturn().getResponse().getContentAsString();
 
         JsonNode created = objectMapper.readTree(createResponse).path("data");
@@ -111,19 +120,38 @@ class RepositoryConfigApiTest {
 
         assertThat(taskStore.succeed(taskId, "api-test", 0)).isTrue();
 
-        mockMvc.perform(put("/api/config/projects/{id}", repositoryId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(Map.of(
+        mockMvc.perform(multipart("/api/config/projects/{id}", repositoryId)
+                .file(configPart(Map.of(
                     "gitRepoUrl", "https://github.com/example/payment-service.git",
                     "gitBranch", "release",
                     "languages", List.of("go"),
                     "authType", "NONE",
-                    "endpointRuleSources", List.of()
-                ))))
+                    "clearEndpointRules", false
+                )))
+                .with(request -> {
+                    request.setMethod("PUT");
+                    return request;
+                }))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.hasAccessToken").value(false))
             .andExpect(jsonPath("$.data.status").value("done"))
-            .andExpect(jsonPath("$.data.gitBranch").value("release"));
+            .andExpect(jsonPath("$.data.gitBranch").value("release"))
+            .andExpect(jsonPath("$.data.endpointRuleCount").value(2));
+
+        mockMvc.perform(multipart("/api/config/projects/{id}", repositoryId)
+                .file(configPart(Map.of(
+                    "gitRepoUrl", "https://github.com/example/payment-service.git",
+                    "gitBranch", "release",
+                    "languages", List.of("go"),
+                    "authType", "NONE",
+                    "clearEndpointRules", true
+                )))
+                .with(request -> {
+                    request.setMethod("PUT");
+                    return request;
+                }))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.endpointRuleCount").value(0));
 
         assertThat(jdbc.queryForObject(
             "SELECT access_token FROM repository_config WHERE id = ?", String.class, repositoryId)).isNull();
@@ -134,5 +162,48 @@ class RepositoryConfigApiTest {
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.status").value("CANCELED"))
             .andExpect(jsonPath("$.data.cancelRequested").value(true));
+    }
+
+    @Test
+    void repositoryRejectsMultipleLanguagesAndInvalidRuleArchive() throws Exception {
+        mockMvc.perform(multipart("/api/config/projects")
+                .file(configPart(Map.of(
+                    "gitRepoUrl", "https://github.com/example/multi-language.git",
+                    "languages", List.of("java", "go"),
+                    "authType", "NONE"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("每个仓库只能选择一种源码语言"));
+
+        mockMvc.perform(multipart("/api/config/projects")
+                .file(configPart(Map.of(
+                    "gitRepoUrl", "https://github.com/example/invalid-rules.git",
+                    "languages", List.of("java"),
+                    "authType", "NONE"
+                )))
+                .file(new MockMultipartFile(
+                    "endpointRules", "rules.zip", "application/zip", "not-a-zip".getBytes(StandardCharsets.UTF_8))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("端点规则包不是有效的 ZIP 文件"));
+    }
+
+    private MockMultipartFile configPart(Map<String, ?> config) throws Exception {
+        return new MockMultipartFile(
+            "config", "config.json", MediaType.APPLICATION_JSON_VALUE,
+            objectMapper.writeValueAsBytes(config));
+    }
+
+    private MockMultipartFile rulesArchive(Map<String, String> entries) throws Exception {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
+            for (Map.Entry<String, String> entry : entries.entrySet()) {
+                zip.putNextEntry(new ZipEntry(entry.getKey()));
+                zip.write(entry.getValue().getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
+            }
+        }
+        return new MockMultipartFile("endpointRules", "endpoint-rules.zip", "application/zip", bytes.toByteArray());
     }
 }

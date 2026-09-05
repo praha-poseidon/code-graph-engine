@@ -121,8 +121,8 @@ public class RepositoryConfigStore {
         if (request == null || request.gitRepoUrl() == null || request.gitRepoUrl().isBlank()) {
             throw new IllegalArgumentException("仓库地址不能为空");
         }
-        if (languages(request).isEmpty()) {
-            throw new IllegalArgumentException("至少选择一种语言");
+        if (languages(request).size() != 1) {
+            throw new IllegalArgumentException("每个仓库只能选择一种源码语言");
         }
         String auth = authType(request);
         if (!List.of("NONE", "SSH", "ACCESS_TOKEN").contains(auth)) {
