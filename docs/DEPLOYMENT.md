@@ -16,6 +16,15 @@ docker compose ps
 Open `http://localhost:8084/workbench`.
 
 Parser CLIs are mounted from `CODEGRAPH_PARSER_HOME` into `/opt/codegraph/parsers`.
+
+If you want the application image itself to carry one complete language package,
+set `CODEGRAPH_TOOL_BUNDLE_URL` before building. It must point to a
+`codegraph-tools-<language>-linux-x64.tar.gz` release asset. The bundle is
+installed under `/opt/codegraph/tool-bundle` and contains the parser CLI,
+static-extract CLI, Skill, `start.sh`, and `install.sh`. Configure the parser
+command to use `/opt/codegraph/tool-bundle/bin/parser-<language>` (JavaScript
+and TypeScript use `parser-js`). The regular parser volume remains available for
+local overrides.
 The image does not claim that every language CLI is installed: keep
 `CODEGRAPH_PARSER_PROCESS_LANGUAGES` empty until the matching language package has been unpacked.
 Then enable only that language and point its command at the mounted executable, for example:

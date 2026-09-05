@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        CODEGRAPH_TOOL_BUNDLE_URL: ${CODEGRAPH_TOOL_BUNDLE_URL:-}
     image: codegraph/workbench:${CODEGRAPH_VERSION:-local}
     restart: unless-stopped
     environment:

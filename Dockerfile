@@ -18,6 +18,8 @@ LABEL org.opencontainers.image.title="Code Graph Workbench" \
       org.opencontainers.image.base.name="centos:8.2.2004" \
       org.opencontainers.image.description="Code graph workbench application; database services are supplied by compose"
 
+ARG CODEGRAPH_TOOL_BUNDLE_URL=""
+
 RUN sed -i -e 's|^mirrorlist=|#mirrorlist=|g' \
            -e 's|^#baseurl=http://mirror.centos.org/\$contentdir/\$releasever|baseurl=https://vault.centos.org/8.2.2004|g' \
            /etc/yum.repos.d/CentOS-*.repo \
@@ -33,7 +35,12 @@ COPY --from=application-build /opt/java/openjdk /opt/java/openjdk
 COPY --from=application-build /source/code-graph-app/target/code-graph-app-0.0.1-SNAPSHOT.jar /opt/codegraph/code-graph-app.jar
 
 RUN useradd --system --uid 10001 --home-dir /var/lib/codegraph --create-home codegraph \
-    && mkdir -p /opt/codegraph/parsers/bin /var/lib/codegraph/workspaces \
+    && mkdir -p /opt/codegraph/parsers/bin /opt/codegraph/tool-bundle /var/lib/codegraph/workspaces \
+    && if [ -n "$CODEGRAPH_TOOL_BUNDLE_URL" ]; then \
+         curl --fail --location --retry 3 "$CODEGRAPH_TOOL_BUNDLE_URL" -o /tmp/codegraph-tools.tar.gz \
+         && tar -xzf /tmp/codegraph-tools.tar.gz --strip-components=1 -C /opt/codegraph/tool-bundle \
+         && rm -f /tmp/codegraph-tools.tar.gz; \
+       fi \
     && chown -R codegraph:codegraph /opt/codegraph /var/lib/codegraph
 
 USER codegraph
