@@ -34,6 +34,11 @@ CODEGRAPH_PARSER_PROCESS_LANGUAGES=java
 CODEGRAPH_PARSER_JAVA_COMMAND=/opt/codegraph/parsers/bin/parser-java --stdio-stream
 ```
 
+The application image can be published to GitHub Container Registry with the
+`Publish workbench image` workflow. Run it manually with an image tag, or push a
+`v*` tag. This publishes only the application layer; MySQL, Neo4j, Qdrant and
+the other infrastructure remain the compose services.
+
 A Go parser using `--stdio-stream` is kept alive for the lifetime of one analysis task, while files
 are still applied sequentially. The same task-scoped process boundary is used for other streaming
 parsers; one-shot parsers are started and released per request.
