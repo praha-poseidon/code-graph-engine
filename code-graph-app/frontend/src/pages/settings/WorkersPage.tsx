@@ -49,7 +49,7 @@ export default function WorkersPage() {
   }), [workers])
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 px-6 py-7 animate-fadeIn">
+    <div className="w-full space-y-6 px-6 py-7 animate-fadeIn">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-ink-900">Worker 监控</h2>
