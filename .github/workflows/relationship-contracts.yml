@@ -220,6 +220,7 @@ jobs:
             PythonProcessParserEndToEndTest:4 \
             PhpProcessParserEndToEndTest:4 \
             KotlinProcessParserEndToEndTest:4
+          python3 -m unittest -v scripts/test_validate_graph_contract.py
 
   swift-contracts:
     runs-on: ubuntu-latest
