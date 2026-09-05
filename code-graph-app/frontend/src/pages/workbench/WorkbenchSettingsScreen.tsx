@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft, FolderGit2, ListTodo, ServerCog, Settings2 } from 'lucide-react'
+import { ChevronLeft, FolderGit2, ListTodo, ServerCog } from 'lucide-react'
 import ProjectsPage from '../settings/ProjectsPage'
 import TaskCenterPage from '../settings/TaskCenterPage'
 import WorkersPage from '../settings/WorkersPage'
@@ -24,14 +24,10 @@ export default function WorkbenchSettingsScreen({ controller }: { controller: Wo
         </button>
         <div>
           <p className="text-sm font-semibold text-white">配置中心</p>
-          <p className="text-xs text-[#77718f]">仓库、解析任务与 Worker</p>
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
         <aside className="w-56 shrink-0 border-r border-white/[0.08] bg-[#090910] p-3">
-          <div className="mb-3 flex items-center gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5f5972]">
-            <Settings2 className="h-3.5 w-3.5" />系统管理
-          </div>
           <nav className="space-y-1">
             <NavItem active={tab === 'projects'} icon={<FolderGit2 className="h-4 w-4" />} label="仓库" description="来源与规则" onClick={() => setTab('projects')} />
             <NavItem active={tab === 'tasks'} icon={<ListTodo className="h-4 w-4" />} label="任务中心" description="队列与执行记录" onClick={() => setTab('tasks')} />
