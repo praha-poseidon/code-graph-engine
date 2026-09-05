@@ -30,7 +30,7 @@ export default function WorkbenchSettingsScreen({ controller }: { controller: Wo
         <aside className="w-56 shrink-0 border-r border-white/[0.08] bg-[#090910] p-3">
           <nav className="space-y-1">
             <NavItem active={tab === 'projects'} icon={<FolderGit2 className="h-4 w-4" />} label="仓库" description="来源与规则" onClick={() => setTab('projects')} />
-            <NavItem active={tab === 'tasks'} icon={<ListTodo className="h-4 w-4" />} label="任务中心" description="队列与执行记录" onClick={() => setTab('tasks')} />
+            <NavItem active={tab === 'tasks'} icon={<ListTodo className="h-4 w-4" />} label="任务中心" description="队列与执行记录" onClick={() => { setTaskRepositoryId(null); setTab('tasks') }} />
             <NavItem active={tab === 'workers'} icon={<ServerCog className="h-4 w-4" />} label="Worker" description="节点与负载" onClick={() => setTab('workers')} />
           </nav>
         </aside>

@@ -9,8 +9,10 @@ import java.util.List;
  */
 @Data
 public class CreateFileNodesRequest {
+    /** Registered repository identity; when supplied the server resolves the graph scope. */
+    private Long repositoryId;
     /**
-     * 项目名称（Git 仓库名），用于生成全局唯一 ID
+     * 独立调用时使用的稳定图谱范围；平台请求优先传 repositoryId，不能传仓库短名。
      */
     private String projectName;
     

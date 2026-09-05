@@ -1,5 +1,7 @@
 package com.poseidon.codegraph.app.adapter.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.poseidon.codegraph.app.adapter.dto.ApiResponse;
 import com.poseidon.codegraph.engine.application.model.CodeEndpointDO;
 import com.poseidon.codegraph.engine.application.model.CodeFunctionDO;
@@ -32,9 +34,11 @@ import java.util.stream.Stream;
 public class GraphViewController {
 
     private final InMemoryCodeGraphRepository repository;
+    private final ObjectMapper objectMapper;
 
-    public GraphViewController(InMemoryCodeGraphRepository repository) {
+    public GraphViewController(InMemoryCodeGraphRepository repository, ObjectMapper objectMapper) {
         this.repository = repository;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping("/metadata")
@@ -257,7 +261,7 @@ public class GraphViewController {
             value.getGitRepoUrl(),
             null,
             null,
-            null);
+            null, properties(value));
     }
 
     private GraphNode node(CodeUnitDO value) {
@@ -271,7 +275,7 @@ public class GraphViewController {
             value.getGitRepoUrl(),
             null,
             null,
-            null);
+            null, properties(value));
     }
 
     private GraphNode node(CodeFunctionDO value) {
@@ -285,7 +289,7 @@ public class GraphViewController {
             value.getGitRepoUrl(),
             null,
             null,
-            null);
+            null, properties(value));
     }
 
     private GraphNode node(CodeEndpointDO value) {
@@ -299,7 +303,12 @@ public class GraphViewController {
             value.getGitRepoUrl(),
             firstText(value.getNormalizedPath(), value.getPath(), value.getTopic(), value.getTableName()),
             value.getHttpMethod(),
-            null);
+            null, properties(value));
+    }
+
+    // Only graph business DTOs reach this method; never serialize repository credentials.
+    private Map<String, Object> properties(Object value) {
+        return objectMapper.convertValue(value, new TypeReference<Map<String, Object>>() { });
     }
 
     private boolean containsIgnoreCase(String value, String normalizedKeyword) {
@@ -335,7 +344,8 @@ public class GraphViewController {
         String gitRepoUrl,
         String path,
         String httpMethod,
-        Integer depth) {
+        Integer depth,
+        Map<String, Object> properties) {
     }
 
     public record GraphRelationship(

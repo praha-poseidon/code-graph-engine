@@ -85,7 +85,7 @@ class RepositoryConfigApiTest {
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
-            .andExpect(jsonPath("$.data.name").value("payment-service"))
+            .andExpect(jsonPath("$.data.name").value("example/payment-service"))
             .andExpect(jsonPath("$.data.languages[0]").value("java"))
             .andExpect(jsonPath("$.data.hasAccessToken").value(true))
             .andExpect(jsonPath("$.data.endpointRuleCount").value(2))

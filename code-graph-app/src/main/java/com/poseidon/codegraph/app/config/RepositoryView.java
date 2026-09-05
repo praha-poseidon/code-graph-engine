@@ -18,5 +18,9 @@ public record RepositoryView(
         int progressTotal,
         String statusMessage,
         Instant lastAnalyzedAt,
-        String latestTaskId) {
+        String latestTaskId,
+        String projectId,
+        String canonicalRepository,
+        String graphScope,
+        String legacyScope) {
 }

@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
+import jakarta.annotation.PostConstruct;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -13,6 +16,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 @Repository
+@DependsOnDatabaseInitialization
 public class RepositoryConfigStore {
 
     private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() { };
@@ -50,6 +54,7 @@ public class RepositoryConfigStore {
         return jdbc.query("SELECT * FROM repository_config WHERE id = ?", rowMapper, id).stream().findFirst();
     }
 
+    @Transactional("repositoryTransactionManager")
     public RepositoryConfig create(RepositoryRequest request) {
         validate(request);
         String url = request.gitRepoUrl().trim();
@@ -65,14 +70,20 @@ public class RepositoryConfigStore {
             "SSH".equals(auth) ? secretCodec.encrypt(request.sshPrivateKey()) : null,
             "SSH".equals(auth) ? secretCodec.encrypt(request.sshPassphrase()) : null,
             writeList(safeList(request.endpointRuleSources())));
-        return jdbc.query("SELECT * FROM repository_config WHERE git_repo_url = ?", rowMapper, url)
+        RepositoryConfig created = jdbc.query("SELECT * FROM repository_config WHERE git_repo_url = ?", rowMapper, url)
             .stream().findFirst().orElseThrow(() -> new IllegalStateException("仓库保存后读取失败"));
+        insertIdentity(created, null);
+        return created;
     }
 
+    @Transactional("repositoryTransactionManager")
     public RepositoryConfig update(long id, RepositoryRequest request) {
         validate(request);
         RepositoryConfig existing = findById(id)
             .orElseThrow(() -> new IllegalArgumentException("仓库不存在: " + id));
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM analysis_task WHERE repository_id = ? AND status IN ('QUEUED', 'RUNNING')", Long.class, id) > 0) {
+            throw new IllegalArgumentException("请等待任务结束后再修改仓库配置");
+        }
         String auth = authType(request);
         String accessToken = "ACCESS_TOKEN".equals(auth)
             ? encryptedOrExisting(request.accessToken(), existing.accessToken()) : null;
@@ -81,6 +92,9 @@ public class RepositoryConfigStore {
         String passphrase = "SSH".equals(auth)
             ? encryptedOrExisting(request.sshPassphrase(), existing.sshPassphrase()) : null;
         String url = request.gitRepoUrl().trim();
+        String canonical = RepositoryIdentity.canonical(url);
+        jdbc.update("UPDATE repository_identity SET repository_key = ?, canonical_repository = ? WHERE repository_id = ?",
+            RepositoryIdentity.hash(canonical), canonical, id);
         jdbc.update("""
             UPDATE repository_config
                SET name = ?, git_repo_url = ?, git_branch = ?, languages = ?, auth_type = ?,
@@ -124,6 +138,7 @@ public class RepositoryConfigStore {
         if (languages(request).size() != 1) {
             throw new IllegalArgumentException("每个仓库只能选择一种源码语言");
         }
+        RepositoryIdentity.canonical(request.gitRepoUrl());
         String auth = authType(request);
         if (!List.of("NONE", "SSH", "ACCESS_TOKEN").contains(auth)) {
             throw new IllegalArgumentException("不支持的认证方式: " + auth);
@@ -149,10 +164,34 @@ public class RepositoryConfigStore {
     }
 
     private String inferName(String gitRepoUrl) {
-        String normalized = gitRepoUrl.replace('\\', '/').replaceAll("[/.]+$", "");
-        int slash = Math.max(normalized.lastIndexOf('/'), normalized.lastIndexOf(':'));
-        String name = slash >= 0 ? normalized.substring(slash + 1) : normalized;
-        return name.endsWith(".git") ? name.substring(0, name.length() - 4) : name;
+        String canonical = RepositoryIdentity.canonical(gitRepoUrl);
+        return canonical.substring(canonical.indexOf('/') + 1);
+    }
+
+    @PostConstruct
+    public void backfillIdentities() {
+        // Additive migration only: legacy graph data is not renamed or deleted.
+        for (RepositoryConfig config : findAll()) {
+            if (jdbc.queryForObject("SELECT COUNT(*) FROM repository_identity WHERE repository_id = ?", Long.class, config.id()) == 0) {
+                try { insertIdentity(config, config.name()); }
+                catch (org.springframework.dao.DuplicateKeyException exception) {
+                    if (jdbc.queryForObject("SELECT COUNT(*) FROM repository_identity WHERE repository_id = ?", Long.class, config.id()) == 0) {
+                        throw new IllegalStateException("旧仓库地址规范化后重复，请先合并重复配置；仓库 ID=" + config.id(), exception);
+                    }
+                }
+            }
+        }
+    }
+
+    private void insertIdentity(RepositoryConfig config, String legacyScope) {
+        String canonical = RepositoryIdentity.canonical(config.gitRepoUrl());
+        jdbc.update("INSERT INTO repository_identity (repository_id, project_id, repository_key, canonical_repository, legacy_scope) VALUES (?, ?, ?, ?, ?)",
+            config.id(), java.util.UUID.randomUUID().toString(), RepositoryIdentity.hash(canonical), canonical, legacyScope);
+    }
+
+    public RepositoryIdentity identity(long repositoryId) {
+        return jdbc.queryForObject("SELECT * FROM repository_identity WHERE repository_id = ?", (rs, row) -> new RepositoryIdentity(
+            rs.getString("project_id"), rs.getString("repository_key"), rs.getString("canonical_repository"), rs.getString("legacy_scope")), repositoryId);
     }
 
     private String writeList(List<String> values) {

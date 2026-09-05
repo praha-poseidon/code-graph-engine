@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AlertCircle, Ban, CheckCircle2, ChevronDown, ChevronUp, CircleX,
+  AlertCircle, Ban, CheckCircle2, CircleX,
   Clock3, Loader2, RefreshCw, RotateCcw, TimerReset,
 } from 'lucide-react'
 import {
@@ -51,9 +51,17 @@ export default function TaskCenterPage({ repositoryId, onRepositoryChange }: {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [events, setEvents] = useState<AnalysisTaskEvent[]>([])
   const [eventsLoading, setEventsLoading] = useState(false)
+  const [eventsError, setEventsError] = useState<string | null>(null)
+  const visibleTasks = useMemo(() => status === 'ALL' ? tasks : tasks.filter(task => task.status === status), [status, tasks])
+  const selectedTask = visibleTasks.find(task => task.id === expanded) ?? visibleTasks[0]
+  const selectedId = selectedTask?.id
   const [error, setError] = useState<string | null>(null)
+  const loadSequence = useRef(0)
+  const [now, setNow] = useState(() => Date.now())
+  const invalidateLoads = useCallback(() => { loadSequence.current++ }, [])
 
   const load = useCallback(async (initial = false) => {
+    const sequence = ++loadSequence.current
     if (initial) setLoading(true)
     else setRefreshing(true)
     try {
@@ -61,14 +69,17 @@ export default function TaskCenterPage({ repositoryId, onRepositoryChange }: {
         fetchTasks(repositoryId),
         fetchRepositoryOptions(),
       ])
+      if (sequence !== loadSequence.current) return
       setTasks(nextTasks)
+      setNow(Date.now())
+      setExpanded(current => current ?? nextTasks[0]?.id ?? null)
       setRepositories(nextRepositories)
       setError(null)
     } catch (cause) {
+      if (sequence !== loadSequence.current) return
       setError(cause instanceof Error ? cause.message : '任务加载失败')
     } finally {
-      setLoading(false)
-      setRefreshing(false)
+      if (sequence === loadSequence.current) { setLoading(false); setRefreshing(false) }
     }
   }, [repositoryId])
 
@@ -76,23 +87,26 @@ export default function TaskCenterPage({ repositoryId, onRepositoryChange }: {
     const initialTimer = window.setTimeout(() => void load(true), 0)
     const refreshTimer = window.setInterval(() => void load(false), 2500)
     return () => {
+      invalidateLoads()
       window.clearTimeout(initialTimer)
       window.clearInterval(refreshTimer)
     }
-  }, [load])
+  }, [load, invalidateLoads])
 
   useEffect(() => {
-    if (!expanded) return
+    if (!selectedId) return
     let active = true
+    let requestSequence = 0
     const loadEvents = async (initial = false) => {
-      if (initial) setEventsLoading(true)
+      const sequence = ++requestSequence
+      if (initial) { setEventsLoading(true); setEventsError(null); setEvents([]) }
       try {
-        const nextEvents = await fetchTaskEvents(expanded)
-        if (active) setEvents(nextEvents)
+        const nextEvents = await fetchTaskEvents(selectedId)
+        if (active && sequence === requestSequence) { setEvents(nextEvents); setEventsError(null) }
       } catch (cause) {
-        if (active) setError(cause instanceof Error ? cause.message : '任务明细加载失败')
+        if (active && sequence === requestSequence) setEventsError(cause instanceof Error ? cause.message : '任务明细加载失败')
       } finally {
-        if (active && initial) setEventsLoading(false)
+        if (active && sequence === requestSequence) setEventsLoading(false)
       }
     }
     void loadEvents(true)
@@ -101,12 +115,8 @@ export default function TaskCenterPage({ repositoryId, onRepositoryChange }: {
       active = false
       window.clearInterval(timer)
     }
-  }, [expanded])
+  }, [selectedId])
 
-  const visibleTasks = useMemo(
-    () => status === 'ALL' ? tasks : tasks.filter(task => task.status === status),
-    [status, tasks],
-  )
   const repositoryNames = useMemo(
     () => new Map(repositories.map(repository => [repository.id, repository.name])),
     [repositories],
@@ -132,11 +142,11 @@ export default function TaskCenterPage({ repositoryId, onRepositoryChange }: {
   }
 
   return (
-    <div className="w-full space-y-6 px-6 py-7 animate-fadeIn">
+    <div className="flex h-full min-h-0 w-full flex-col gap-5 px-6 py-6 animate-fadeIn">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-ink-900">任务中心</h2>
-          <p className="mt-1 text-sm text-ink-500">查看所有仓库的解析队列、执行进度和失败原因。</p>
+          <p className="mt-1 text-sm text-ink-500">查看每次解析任务的进度和执行明细。</p>
         </div>
         <button onClick={() => void load(false)} disabled={refreshing} className="flex h-9 items-center gap-2 rounded-lg border border-ink-200 bg-white px-3 text-xs text-ink-500 transition hover:text-ink-800 disabled:opacity-50">
           <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />刷新
@@ -172,88 +182,82 @@ export default function TaskCenterPage({ repositoryId, onRepositoryChange }: {
       ) : visibleTasks.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-ink-200 py-20 text-center text-sm text-ink-400">当前筛选条件下没有任务</div>
       ) : (
-        <div className="space-y-3">
-          {visibleTasks.map(task => {
-            const meta = statusMeta[task.status]
-            const StatusIcon = meta.icon
-            const progress = task.progressTotal > 0
-              ? Math.round(task.progressCurrent / task.progressTotal * 100)
-              : task.status === 'RUNNING' ? 6 : 0
-            const open = expanded === task.id
-            const cancelable = task.status === 'QUEUED' || task.status === 'RUNNING'
-            return (
-              <article key={task.id} className="overflow-hidden rounded-xl border border-ink-200 bg-white shadow-card">
-                <div className="flex flex-wrap items-start gap-4 px-5 py-4">
-                  <span className={cn('flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium', meta.color)}>
-                    <StatusIcon className={cn('h-3.5 w-3.5', task.status === 'RUNNING' && 'animate-spin')} />{meta.label}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span className="text-sm font-semibold text-ink-900">{repositoryNames.get(task.repositoryId) ?? `仓库 #${task.repositoryId}`}</span>
-                      <span title={task.id} className="font-mono text-[11px] text-ink-400">{shortId(task.id)}</span>
-                      {task.cancelRequested && task.status === 'RUNNING' && <span className="text-[11px] text-amber-300">正在取消</span>}
-                    </div>
-                    <p className="mt-1 truncate text-xs text-ink-500">{task.message || '等待状态更新'}</p>
-                    {(task.status === 'RUNNING' || task.progressTotal > 0) && (
-                      <div className="mt-3 max-w-2xl">
-                        <div className="mb-1 flex justify-between text-[10px] text-ink-400">
-                          <span>{task.status === 'FAILED' || task.status === 'CANCELED' ? '已停止，完成 ' : ''}{task.progressTotal ? `${task.progressCurrent}/${task.progressTotal} 个文件` : '准备中'}</span>
-                          <span>{task.progressTotal ? `${progress}%` : ''}</span>
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]"><div className={cn('h-full rounded-full', task.status === 'FAILED' ? 'bg-rose-400' : task.status === 'CANCELED' ? 'bg-ink-400' : task.status === 'SUCCEEDED' ? 'bg-emerald-400' : 'bg-violet-500 transition-all')} style={{ width: `${progress}%` }} /></div>
-                      </div>
-                    )}
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
+          <div aria-label="任务列表" className="min-h-0 space-y-2 overflow-y-auto pr-1 max-lg:max-h-60">
+            {visibleTasks.map(task => {
+              const meta = statusMeta[task.status]
+              const Icon = meta.icon
+              return (
+                <button key={task.id} onClick={() => setExpanded(task.id)} aria-pressed={selectedId === task.id}
+                  className={cn('w-full rounded-xl border p-4 text-left transition', selectedId === task.id ? 'border-violet-400/50 bg-violet-500/10' : 'border-ink-200 bg-white hover:border-violet-400/30')}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-sm font-semibold text-ink-900">任务 #{shortId(task.id)}</span>
+                    <span className={cn('flex items-center gap-1 rounded-md border px-2 py-1 text-[10px]', meta.color)}><Icon className={cn('h-3 w-3', task.status === 'RUNNING' && 'animate-spin')} />{meta.label}</span>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {cancelable && (
-                      <button onClick={() => void cancel(task)} disabled={canceling === task.id || task.cancelRequested} className="flex h-8 items-center gap-1.5 rounded-lg border border-rose-400/20 px-2.5 text-[11px] text-rose-300 transition hover:bg-rose-400/10 disabled:opacity-40">
-                        {canceling === task.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}取消
-                      </button>
-                    )}
-                    <button onClick={() => {
-                      setEvents([])
-                      setEventsLoading(!open)
-                      setExpanded(open ? null : task.id)
-                    }} title="任务详情" className="grid h-8 w-8 place-items-center rounded-lg text-ink-400 transition hover:bg-ink-50 hover:text-ink-800">
-                      {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </button>
-                  </div>
+                  <p className="mt-2 truncate text-xs text-ink-600">{repositoryNames.get(task.repositoryId) ?? `仓库 #${task.repositoryId}`}</p>
+                  <p className="mt-1 text-[10px] text-ink-400">{formatTime(task.createdAt)}</p>
+                  <TaskProgress task={task} />
+                </button>
+              )
+            })}
+          </div>
+          {selectedTask && (
+            <section aria-label="任务进度详情" className="min-h-0 overflow-y-auto rounded-xl border border-ink-200 bg-white p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-ink-900">任务 #{shortId(selectedTask.id)}</h3>
+                  <p className="mt-1 break-all text-xs text-ink-500">{repositoryNames.get(selectedTask.repositoryId)} · {statusMeta[selectedTask.status].label}</p>
                 </div>
-                {open && (
-                  <div className="grid gap-4 border-t border-ink-100 bg-white/[0.015] px-5 py-4 text-xs md:grid-cols-2 xl:grid-cols-4">
-                    <div className="md:col-span-2 xl:col-span-4">
-                      <p className="mb-3 text-[10px] uppercase tracking-wide text-ink-400">执行明细</p>
-                      {eventsLoading ? (
-                        <div className="flex items-center gap-2 py-3 text-ink-400"><Loader2 className="h-3.5 w-3.5 animate-spin" />正在加载</div>
-                      ) : events.length === 0 ? (
-                        <div className="rounded-lg border border-dashed border-ink-200 px-3 py-4 text-center text-ink-400">该任务还没有执行步骤</div>
-                      ) : (
-                        <div className="space-y-0">
-                          {events.map((event, index) => <TaskEventRow key={event.id} event={event} last={index === events.length - 1} />)}
-                        </div>
-                      )}
-                    </div>
-                    <Detail label="创建时间" value={formatTime(task.createdAt)} />
-                    <Detail label="开始时间" value={formatTime(task.startedAt)} />
-                    <Detail label="完成时间" value={formatTime(task.finishedAt)} />
-                    <Detail label="重试次数" value={`${task.attemptCount} / ${task.maxAttempts}`} icon={<RotateCcw className="h-3 w-3" />} />
-                    <Detail label="执行 Worker" value={task.leaseOwner || '—'} />
-                    <Detail label="Worker 心跳" value={formatTime(task.heartbeatAt)} icon={<TimerReset className="h-3 w-3" />} />
-                    <Detail label="下次重试" value={formatTime(task.nextAttemptAt)} />
-                    <Detail label="任务 ID" value={task.id} mono />
-                    {task.errorDetails && (
-                      <div className="md:col-span-2 xl:col-span-4">
-                        <p className="mb-1.5 text-[10px] uppercase tracking-wide text-ink-400">错误详情</p>
-                        <pre className="max-h-52 overflow-auto whitespace-pre-wrap rounded-lg border border-rose-400/15 bg-rose-400/[0.06] p-3 font-mono text-[11px] leading-5 text-rose-200">{task.errorDetails}</pre>
-                      </div>
-                    )}
-                  </div>
+                {(selectedTask.status === 'QUEUED' || selectedTask.status === 'RUNNING') && (
+                  <button onClick={() => void cancel(selectedTask)} disabled={canceling === selectedId || selectedTask.cancelRequested} className="shrink-0 rounded-lg border border-rose-400/20 px-3 py-2 text-xs text-rose-300 disabled:opacity-40">
+                    {selectedTask.cancelRequested ? '正在取消' : '取消任务'}
+                  </button>
                 )}
-              </article>
-            )
-          })}
+              </div>
+              <p className="mt-4 break-words text-xs text-ink-600">{selectedTask.message || '等待状态更新'}</p>
+              <TaskProgress task={selectedTask} />
+              <div className="my-5 grid grid-cols-2 gap-4 border-y border-ink-100 py-4 text-xs xl:grid-cols-3">
+                <Detail label="创建时间" value={formatTime(selectedTask.createdAt)} />
+                <Detail label="开始时间" value={formatTime(selectedTask.startedAt)} />
+                <Detail label="完成时间" value={formatTime(selectedTask.finishedAt)} />
+                <Detail label="耗时" value={selectedTask.startedAt ? `${Math.max(0, Math.round(((selectedTask.finishedAt ? new Date(selectedTask.finishedAt).getTime() : now) - new Date(selectedTask.startedAt).getTime()) / 1000))} 秒` : '—'} />
+                <Detail label="执行次数" value={`${selectedTask.attemptCount} / ${selectedTask.maxAttempts}`} icon={<RotateCcw className="h-3 w-3" />} />
+                <Detail label="执行 Worker" value={selectedTask.leaseOwner || '—'} />
+                <Detail label="Worker 心跳" value={formatTime(selectedTask.heartbeatAt)} icon={<TimerReset className="h-3 w-3" />} />
+                <Detail label="任务 ID" value={selectedTask.id} mono />
+                {selectedTask.nextAttemptAt && <Detail label="下次重试" value={formatTime(selectedTask.nextAttemptAt)} />}
+              </div>
+              <h4 className="mb-4 text-xs font-semibold text-ink-800">执行明细</h4>
+              {eventsLoading ? <div className="flex items-center gap-2 text-xs text-ink-400"><Loader2 className="h-4 w-4 animate-spin" />正在加载</div>
+                : eventsError ? <ErrorBanner message={eventsError} />
+                : events.length === 0 ? <p className="py-8 text-center text-xs text-ink-400">该任务还没有执行步骤</p>
+                : events.map((event, index) => <TaskEventRow key={event.id} event={event} last={index === events.length - 1} />)}
+              {selectedTask.errorDetails && (
+                <details className="mt-4 rounded-lg border border-rose-400/20 p-3 text-xs text-rose-200">
+                  <summary className="cursor-pointer">错误详情</summary>
+                  <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px]">{selectedTask.errorDetails}</pre>
+                </details>
+              )}
+            </section>
+          )}
         </div>
       )}
+    </div>
+  )
+}
+
+function TaskProgress({ task }: { task: AnalysisTask }) {
+  const percent = task.progressTotal > 0 ? Math.min(100, Math.max(0, Math.round(task.progressCurrent / task.progressTotal * 100))) : 0
+  const stopped = task.status === 'FAILED' || task.status === 'CANCELED'
+  return (
+    <div className="mt-3">
+      <div className="mb-1 flex justify-between text-[10px] text-ink-400">
+        <span>{stopped ? '已停止 · ' : ''}{task.progressTotal > 0 ? `${task.progressCurrent}/${task.progressTotal} 个文件` : task.status === 'RUNNING' ? '准备中' : statusMeta[task.status].label}</span>
+        <span>{task.progressTotal > 0 ? `${percent}%` : ''}</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+        <div className={cn('h-full rounded-full', task.status === 'FAILED' ? 'bg-rose-400' : task.status === 'CANCELED' ? 'bg-ink-400' : task.status === 'SUCCEEDED' ? 'bg-emerald-400' : 'bg-violet-500')} style={{ width: `${percent}%` }} />
+      </div>
     </div>
   )
 }

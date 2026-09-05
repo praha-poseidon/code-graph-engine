@@ -19,7 +19,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class CodeGraphControllerTest {
 
     private final IncrementalUpdateService service = mock(IncrementalUpdateService.class);
-    private final CodeGraphController controller = new CodeGraphController(service, new ObjectMapper());
+    private final com.poseidon.codegraph.app.config.RepositoryConfigStore repositories = mock(com.poseidon.codegraph.app.config.RepositoryConfigStore.class);
+    private final CodeGraphController controller = new CodeGraphController(service, new ObjectMapper(), repositories);
 
     @Test
     void healthReturnsOk() {
@@ -28,6 +29,28 @@ class CodeGraphControllerTest {
         assertThat(response.getCode()).isEqualTo(200);
         assertThat(response.getMessage()).isEqualTo("服务运行正常");
         assertThat(response.getData()).isEqualTo("OK");
+    }
+
+    @Test
+    void registeredRepositoryUsesSameServerScopeForAddUpdateAndDelete() {
+        var repository = mock(com.poseidon.codegraph.app.config.RepositoryConfig.class);
+        org.mockito.Mockito.when(repository.id()).thenReturn(7L);
+        org.mockito.Mockito.when(repository.gitRepoUrl()).thenReturn("https://github.com/team/demo.git");
+        org.mockito.Mockito.when(repository.gitBranch()).thenReturn("main");
+        var identity = new com.poseidon.codegraph.app.config.RepositoryIdentity("uuid", "key", "github.com/team/demo", null);
+        org.mockito.Mockito.when(repositories.findById(7L)).thenReturn(java.util.Optional.of(repository));
+        org.mockito.Mockito.when(repositories.identity(7L)).thenReturn(identity);
+        var request = request();
+        request.setRepositoryId(7L);
+        request.setProjectName("unsafe-short-name");
+        request.setGitBranch(null);
+        assertThat(controller.createFileNodes(request).getCode()).isEqualTo(200);
+        assertThat(controller.updateFileNodes(request).getCode()).isEqualTo(200);
+        assertThat(controller.deleteFileNodes(request).getCode()).isEqualTo(200);
+        String scope = identity.graphScope("main");
+        verify(service).handleFileAdded(eq(scope), any(), any(), eq("https://github.com/team/demo.git"), eq("main"), any(), any(), any(), any());
+        verify(service).handleFileModified(eq(scope), any(), any(), eq("https://github.com/team/demo.git"), eq("main"), any(), any(), any(), any());
+        verify(service).handleFileDeleted(eq(scope), any(), any(), eq("https://github.com/team/demo.git"), eq("main"), any(), any());
     }
 
     @Test

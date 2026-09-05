@@ -139,10 +139,11 @@ public class RepositoryConfigController {
     }
 
     private RepositoryView view(RepositoryConfig repository) {
+        var identity = repositoryStore.identity(repository.id());
         AnalysisTask latest = taskStore.latestForRepository(repository.id()).orElse(null);
         return new RepositoryView(
             repository.id(),
-            repository.name(),
+            identity.canonicalRepository().substring(identity.canonicalRepository().indexOf('/') + 1),
             repository.gitRepoUrl(),
             repository.gitBranch(),
             repository.languages(),
@@ -155,7 +156,8 @@ public class RepositoryConfigController {
             latest == null ? 0 : latest.progressTotal(),
             latest == null ? null : latest.message(),
             repository.lastAnalyzedAt(),
-            latest == null ? null : latest.id());
+            latest == null ? null : latest.id(),
+            identity.projectId(), identity.canonicalRepository(), identity.graphScope(repository.gitBranch()), identity.legacyScope());
     }
 
     private String status(String repositoryStatus, AnalysisTask latest) {

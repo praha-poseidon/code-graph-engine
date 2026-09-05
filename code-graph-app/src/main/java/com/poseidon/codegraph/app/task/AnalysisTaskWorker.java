@@ -141,6 +141,7 @@ public final class AnalysisTaskWorker {
         String activeEventId = null;
         try {
             repository = repositoryStore.decrypted(encrypted);
+            String graphScope = repositoryStore.identity(repository.id()).graphScope(repository.gitBranch());
             checkpoint(task.id());
             progress(task.id(), 0, 0, "克隆仓库");
             activeEventId = taskEventStore.start(task.id(), "CLONE", "正在克隆仓库");
@@ -187,7 +188,7 @@ public final class AnalysisTaskWorker {
                     String language = languageFor(file);
                     IncrementalUpdateSession session = sessions.get(language);
                     session.handleFileAdded(
-                        repository.name(),
+                        graphScope,
                         file.toAbsolutePath().normalize().toString(),
                         projectFilePath,
                         repository.gitRepoUrl(),

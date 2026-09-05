@@ -1,4 +1,5 @@
 import { GitBranch, Play, X } from 'lucide-react'
+import { useState } from 'react'
 import type { WorkbenchController } from '../state/useWorkbenchState'
 
 function DetailRow({ label, value }: { label: string; value?: string | number | null }) {
@@ -15,11 +16,14 @@ function DetailRow({ label, value }: { label: string; value?: string | number | 
 }
 
 export default function NodeDetails({ controller }: { controller: WorkbenchController }) {
+  const [copyStatus, setCopyStatus] = useState('')
   const node = controller.selectedNode
   if (!node) return null
+  const properties = node.properties ?? { id: node.id, name: node.fullName, type: node.type }
+  const value = (key: string) => properties[key] == null ? undefined : String(properties[key])
 
   return (
-    <aside className="absolute right-24 top-5 z-40 flex max-h-[calc(100%-96px)] w-[320px] flex-col overflow-hidden rounded-xl border border-white/12 bg-[#10111d]/96 shadow-2xl backdrop-blur">
+    <aside className="absolute right-5 top-5 z-40 flex max-h-[calc(100%-40px)] w-[400px] max-w-[calc(100%-40px)] flex-col overflow-hidden rounded-xl border border-white/12 bg-[#10111d]/96 shadow-2xl backdrop-blur">
       <div className="flex min-h-12 items-center justify-between gap-3 border-b border-white/10 px-3.5">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -40,10 +44,32 @@ export default function NodeDetails({ controller }: { controller: WorkbenchContr
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3.5">
         <DetailRow label="ID" value={node.id} />
-        <DetailRow label="Qualified" value={node.qualifiedName || node.fullName} />
-        <DetailRow label="File" value={node.filePath || node.path} />
-        <DetailRow label="Repo" value={node.gitRepoUrl} />
-        <DetailRow label="Endpoint" value={node.httpMethod} />
+        <DetailRow label="完整名称" value={node.qualifiedName || node.fullName} />
+        <DetailRow label="语言" value={value('language')} />
+        <DetailRow label="项目标识" value={value('projectName')} />
+        <DetailRow label="文件" value={node.filePath || node.path} />
+        <DetailRow label="代码位置" value={properties.startLine != null ? `${value('startLine')}–${value('endLine') ?? value('startLine')} 行` : undefined} />
+        <DetailRow label="仓库" value={node.gitRepoUrl} />
+        <DetailRow label="分支" value={value('gitBranch')} />
+        <DetailRow label="签名" value={value('signature')} />
+        <DetailRow label="返回类型" value={value('returnType')} />
+        <DetailRow label="HTTP 方法" value={node.httpMethod} />
+        <details key={node.id} className="rounded-xl border border-white/10 p-3">
+          <summary className="cursor-pointer text-xs font-medium text-[#dcd5ef]">全部属性（{Object.keys(properties).length}）</summary>
+          <button type="button" onClick={async () => {
+            try { await navigator.clipboard.writeText(JSON.stringify(properties, null, 2)); setCopyStatus('已复制') }
+            catch { setCopyStatus('复制失败，请手动选择属性') }
+          }} className="my-3 text-xs text-violet-300">复制 JSON</button>
+          <span role="status" className="ml-2 text-[10px] text-[#9d97b6]">{copyStatus}</span>
+          <dl className="divide-y divide-white/5">
+            {Object.entries(properties).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => (
+              <div key={key} className="py-2">
+                <dt className="break-all text-[10px] text-[#9d97b6]">{key}</dt>
+                <dd className="mt-1 whitespace-pre-wrap break-all font-mono text-[11px] text-[#dcd5ef]">{typeof entry === 'string' ? entry : JSON.stringify(entry, null, 2) ?? 'null'}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
 
         <section className="space-y-3 rounded-xl border border-white/10 bg-white/[0.025] p-3">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[#9d97b6]">

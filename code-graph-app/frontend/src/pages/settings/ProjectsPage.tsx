@@ -7,6 +7,10 @@ import { apiGet, apiPost, request } from '../../lib/http'
 import { cn } from '../../lib/utils'
 
 interface Project {
+  projectId?: string
+  canonicalRepository?: string
+  graphScope?: string
+  legacyScope?: string | null
   id: number
   name: string
   gitRepoUrl: string
@@ -300,22 +304,23 @@ export default function ProjectsPage({ onOpenTasks }: { onOpenTasks?: (repositor
                       <span className="mt-1 block">下载当前语言的工具包，解压并运行 start.sh，按提示选择项目和 Agent。完成后上传桌面生成的 ZIP。</span>
                     </span>
                   </span>
+                  {selectedTool && (
+                    <a
+                      href={selectedTool.downloadUrl}
+                      title={`下载 ${LANGUAGES.find(([value]) => value === form.language)?.[1]} 规则生成工具`}
+                      aria-label={`下载 ${LANGUAGES.find(([value]) => value === form.language)?.[1]} 规则生成工具`}
+                      className="ml-1 inline-flex items-center gap-1 rounded text-xs font-normal text-violet-300 underline-offset-4 transition hover:text-violet-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
+                      download
+                    >
+                      <Download className="h-3 w-3" /> 下载工具
+                    </a>
+                  )}
                 </span>
               )}>
-                {selectedTool && (
-                  <a
-                    href={selectedTool.downloadUrl}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-sm font-medium text-violet-200 transition hover:bg-violet-500/20"
-                    download
-                  >
-                    <Download className="h-4 w-4" /> 下载
-                  </a>
-                )}
                 <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-ink-200 px-4 py-4 transition hover:border-violet-400/50 hover:bg-violet-500/[0.04]">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-200"><UploadCloud className="h-5 w-5" /></span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-ink-700">上传 ZIP 规则包</span>
-                    <span className="mt-0.5 block text-xs text-ink-400">上传桌面生成的端点规则 ZIP</span>
+                    <span className="block text-sm font-medium text-ink-700">上传规则包 <span className="ml-1 text-xs font-normal text-ink-400">ZIP</span></span>
                   </span>
                   <input
                     type="file"
@@ -386,6 +391,13 @@ function RepositoryCard({ project, onAnalyze, onEdit, onDelete, onOpenTasks }: {
             {project.languages.map(language => <span key={language} className="rounded bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase text-ink-400">{language}</span>)}
           </div>
           <p className="mt-1 truncate font-mono text-xs text-ink-400">{project.gitRepoUrl}</p>
+          {project.projectId && <details className="mt-2 text-[11px] text-ink-400">
+            <summary className="cursor-pointer">项目标识</summary>
+            <p className="mt-1 break-all font-mono">{project.projectId}</p>
+            <p className="mt-1 break-all">{project.canonicalRepository}</p>
+            <p className="mt-1 break-all font-mono">{project.graphScope}</p>
+            {project.legacyScope && <p className="mt-2 text-amber-300">旧图谱标识：{project.legacyScope}。旧数据保留，新任务使用独立标识；请重新分析生成新版图谱。</p>}
+          </details>}
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-400">
             <span>分支：{project.gitBranch || '默认分支'}</span>
             <span>认证：{project.authType === 'NONE' ? '公开仓库' : project.authType}</span>

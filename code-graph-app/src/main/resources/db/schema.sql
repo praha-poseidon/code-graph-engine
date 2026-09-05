@@ -16,6 +16,15 @@ CREATE TABLE IF NOT EXISTS repository_config (
     CONSTRAINT uk_repository_config_url UNIQUE (git_repo_url)
 );
 
+CREATE TABLE IF NOT EXISTS repository_identity (
+    repository_id BIGINT PRIMARY KEY,
+    project_id VARCHAR(36) NOT NULL UNIQUE,
+    repository_key VARCHAR(64) NOT NULL UNIQUE,
+    canonical_repository VARCHAR(2048) NOT NULL,
+    legacy_scope VARCHAR(255),
+    FOREIGN KEY (repository_id) REFERENCES repository_config(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS analysis_task (
     id VARCHAR(36) PRIMARY KEY,
     repository_id BIGINT NOT NULL,

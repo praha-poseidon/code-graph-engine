@@ -84,7 +84,46 @@ class JavaProcessParserEndToEndTest {
         }
     }
 
+    @Test
+    void registeredProjectAndBranchScopesKeepRealSourceRelationshipsIsolated() throws Exception {
+        var a = new com.poseidon.codegraph.app.config.RepositoryIdentity("a", "key-a", "github.com/team-a/demo", null);
+        var b = new com.poseidon.codegraph.app.config.RepositoryIdentity("b", "key-b", "github.com/team-b/demo", null);
+        var repository = new InMemoryCodeGraphRepository();
+        var service = new IncrementalUpdateService(repository, repository, repository, repository, repository);
+        var scopes = List.of(a.graphScope("main"), a.graphScope("feature"), b.graphScope("main"));
+        Oracle oracle = MAPPER.readValue(fixtureRoot().resolve("source-oracle.json").toFile(), Oracle.class);
+        for (String scope : scopes) persistFixture(service, scope);
+        for (String scope : scopes) {
+            for (ExpectedRelationship edge : oracle.relationships()) {
+                assertThat(repository.findOutgoingRelationships(scope, scope + "::" + edge.from(), edge.type()))
+                    .extracting(com.poseidon.codegraph.engine.application.model.CodeRelationshipDO::getToNodeId)
+                    .contains(scope + "::" + edge.to());
+            }
+            assertThat(repository.findRelationshipsByProject(scope)).allSatisfy(edge -> {
+                assertThat(edge.getFromNodeId()).startsWith(scope + "::");
+                assertThat(edge.getToNodeId()).startsWith(scope + "::");
+            });
+        }
+        int before = repository.findRelationshipsByProject(scopes.getFirst()).size();
+        persistFixture(service, scopes.getFirst());
+        assertThat(repository.findRelationshipsByProject(scopes.getFirst())).hasSize(before);
+        Path sourceRoot = fixtureRoot().resolve("src/main/java");
+        try (var session = service.openSession("java")) {
+            session.handleFileDeleted(scopes.getFirst(), sourceRoot.resolve("demo/app/AdvanceCaller.java").toString(),
+                "demo/app/AdvanceCaller.java", "git@example/java-process-e2e.git", "main", new String[0], new String[]{sourceRoot.toString()});
+        }
+        String caller = "fn:demo.app.AdvanceCaller.run(demo.api.AdvanceService,demo.model.AdvanceApply)";
+        assertThat(repository.findFunctionsByProject(scopes.getFirst())).noneMatch(fn -> fn.getId().equals(scopes.getFirst() + "::" + caller));
+        for (String untouched : scopes.subList(1, scopes.size())) {
+            assertThat(repository.findFunctionsByProject(untouched)).anyMatch(fn -> fn.getId().equals(untouched + "::" + caller));
+        }
+    }
+
     private static void persistFixture(IncrementalUpdateService service) {
+        persistFixture(service, PROJECT);
+    }
+
+    private static void persistFixture(IncrementalUpdateService service, String project) {
         Path root = fixtureRoot();
         Path sourceRoot = root.resolve("src/main/java");
         try (IncrementalUpdateSession session = service.openSession("java")) {
@@ -97,7 +136,7 @@ class JavaProcessParserEndToEndTest {
                     "demo/impl/AdvanceServiceImpl.java",
                     "demo/app/AdvanceCaller.java")) {
                 session.handleFileAdded(
-                    PROJECT,
+                    project,
                     sourceRoot.resolve(relative).toString(),
                     relative,
                     "git@example/java-process-e2e.git",

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.poseidon.codegraph.app.adapter.dto.ApiResponse;
 import com.poseidon.codegraph.app.adapter.dto.CreateFileNodesRequest;
+import com.poseidon.codegraph.app.config.RepositoryConfigStore;
 import com.poseidon.codegraph.model.delta.GraphDelta;
 import com.poseidon.codegraph.starter.service.IncrementalUpdateService;
 import lombok.extern.slf4j.Slf4j;
@@ -24,11 +25,13 @@ public class CodeGraphController {
     
     private final IncrementalUpdateService incrementalUpdateService;
     private final GraphDeltaImportMapper graphDeltaImportMapper;
+    private final RepositoryConfigStore repositoryStore;
     
     @Autowired
-    public CodeGraphController(IncrementalUpdateService incrementalUpdateService, ObjectMapper objectMapper) {
+    public CodeGraphController(IncrementalUpdateService incrementalUpdateService, ObjectMapper objectMapper, RepositoryConfigStore repositoryStore) {
         this.incrementalUpdateService = incrementalUpdateService;
         this.graphDeltaImportMapper = new GraphDeltaImportMapper(objectMapper);
+        this.repositoryStore = repositoryStore;
     }
 
     /**
@@ -61,6 +64,7 @@ public class CodeGraphController {
     @PostMapping("/files/nodes")
     public ApiResponse<Void> createFileNodes(@RequestBody CreateFileNodesRequest request) {
         try {
+            resolveScope(request);
             log.info("创建文件节点请求: projectName={}, absoluteFile={}, projectFile={}",
                 request.getProjectName(), request.getAbsoluteFilePath(), request.getProjectFilePath());
 
@@ -99,6 +103,7 @@ public class CodeGraphController {
     @PutMapping("/files/nodes")
     public ApiResponse<Void> updateFileNodes(@RequestBody CreateFileNodesRequest request) {
         try {
+            resolveScope(request);
             log.info("更新文件节点请求: projectName={}, absoluteFile={}, projectFile={}", 
                 request.getProjectName(), request.getAbsoluteFilePath(), request.getProjectFilePath());
             
@@ -139,6 +144,7 @@ public class CodeGraphController {
     @DeleteMapping("/files/nodes")
     public ApiResponse<Void> deleteFileNodes(@RequestBody CreateFileNodesRequest request) {
         try {
+            resolveScope(request);
             log.info("删除文件节点请求: projectName={}, projectFile={}", 
                 request.getProjectName(), request.getProjectFilePath());
             
@@ -176,6 +182,16 @@ public class CodeGraphController {
     @GetMapping("/health-check")
     public ApiResponse<String> health() {
         return ApiResponse.success("服务运行正常", "OK");
+    }
+
+    private void resolveScope(CreateFileNodesRequest request) {
+        if (request.getRepositoryId() == null) return;
+        var repository = repositoryStore.findById(request.getRepositoryId())
+            .orElseThrow(() -> new IllegalArgumentException("仓库不存在"));
+        String branch = request.getGitBranch() == null ? repository.gitBranch() : request.getGitBranch();
+        request.setProjectName(repositoryStore.identity(repository.id()).graphScope(branch));
+        request.setGitRepoUrl(repository.gitRepoUrl());
+        request.setGitBranch(branch);
     }
 
     private ApiResponse<Void> validateParseRequest(CreateFileNodesRequest request) {

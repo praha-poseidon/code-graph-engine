@@ -75,6 +75,7 @@ export const mapGraphNode = (node: GraphNodeDto): GraphNode | null => {
     path: node.path,
     httpMethod: node.httpMethod,
     depth: node.depth,
+    properties: node.properties,
   }
 }
 

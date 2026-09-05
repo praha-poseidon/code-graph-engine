@@ -1,4 +1,5 @@
 export interface GraphNodeDto {
+  properties?: Record<string, unknown>
   id?: string
   elementId?: string
   type?: string
