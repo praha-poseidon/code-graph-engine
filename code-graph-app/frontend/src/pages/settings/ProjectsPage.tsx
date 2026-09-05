@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  AlertCircle, CheckCircle2, Clock, FileArchive, FolderGit2, KeyRound, Loader2,
+  AlertCircle, CheckCircle2, CircleHelp, Clock, FileArchive, FolderGit2, KeyRound, Loader2,
   ListTodo, Pencil, Play, Plus, Trash2, UploadCloud, X, XCircle,
 } from 'lucide-react'
 import { apiGet, apiPost, request } from '../../lib/http'
@@ -261,7 +261,31 @@ export default function ProjectsPage({ onOpenTasks }: { onOpenTasks?: (repositor
                 </div>
               )}
 
-              <Field label="端点规则包（可选）">
+              <Field label={(
+                <span className="flex items-center gap-1.5">
+                  <span>端点规则包（可选）</span>
+                  <span className="group relative inline-flex">
+                    <button
+                      type="button"
+                      aria-label="什么是端点规则包"
+                      aria-describedby="endpoint-rule-help"
+                      className="grid h-4 w-4 place-items-center rounded-full text-ink-400 transition hover:text-violet-200 focus:text-violet-200 focus:outline-none focus:ring-2 focus:ring-violet-400/40"
+                    >
+                      <CircleHelp className="h-3.5 w-3.5" />
+                    </button>
+                    <span
+                      id="endpoint-rule-help"
+                      role="tooltip"
+                      className="pointer-events-none invisible absolute bottom-full left-0 z-30 mb-2 w-80 max-w-[calc(100vw-3rem)] rounded-xl border border-ink-200 bg-[#171322] p-3 text-left text-xs font-normal leading-5 text-ink-600 opacity-0 shadow-2xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
+                    >
+                      <strong className="block font-medium text-ink-900">它是做什么的？</strong>
+                      <span className="mt-1 block">告诉解析器哪些代码调用属于 HTTP、RPC、数据库或消息队列端点，并生成统一端点标识，用来连接完整调用链。</span>
+                      <strong className="mt-2 block font-medium text-ink-900">怎么使用？</strong>
+                      <span className="mt-1 block">使用当前语言对应的 CLI + Skill 编写并验证 .ser 规则，导出 ZIP 后上传。ZIP 内只需放 UTF-8 编码的 .ser 文件。</span>
+                    </span>
+                  </span>
+                </span>
+              )}>
                 <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-ink-200 px-4 py-4 transition hover:border-violet-400/50 hover:bg-violet-500/[0.04]">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-200"><UploadCloud className="h-5 w-5" /></span>
                   <span className="min-w-0 flex-1">
@@ -366,8 +390,8 @@ function Metric({ label, value, accent }: { label: string; value: number; accent
   return <div className="rounded-xl border border-ink-200 bg-white px-4 py-3"><p className="text-xs text-ink-400">{label}</p><p className={cn('mt-1 text-xl font-semibold text-ink-900', accent)}>{value}</p></div>
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-1.5"><label className="text-xs font-medium text-ink-600">{label}</label>{children}</div>
+function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
+  return <div className="space-y-1.5"><div className="text-xs font-medium text-ink-600">{label}</div>{children}</div>
 }
 
 function RuleArchiveStatus({ label, detail, onRemove }: { label: string; detail: string; onRemove: () => void }) {
