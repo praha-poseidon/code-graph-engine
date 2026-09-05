@@ -197,10 +197,10 @@ export default function TaskCenterPage({ repositoryId, onRepositoryChange }: {
                     {(task.status === 'RUNNING' || task.progressTotal > 0) && (
                       <div className="mt-3 max-w-2xl">
                         <div className="mb-1 flex justify-between text-[10px] text-ink-400">
-                          <span>{task.progressTotal ? `${task.progressCurrent}/${task.progressTotal} 个文件` : '准备中'}</span>
+                          <span>{task.status === 'FAILED' || task.status === 'CANCELED' ? '已停止，完成 ' : ''}{task.progressTotal ? `${task.progressCurrent}/${task.progressTotal} 个文件` : '准备中'}</span>
                           <span>{task.progressTotal ? `${progress}%` : ''}</span>
                         </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${progress}%` }} /></div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]"><div className={cn('h-full rounded-full', task.status === 'FAILED' ? 'bg-rose-400' : task.status === 'CANCELED' ? 'bg-ink-400' : task.status === 'SUCCEEDED' ? 'bg-emerald-400' : 'bg-violet-500 transition-all')} style={{ width: `${progress}%` }} /></div>
                       </div>
                     )}
                   </div>
