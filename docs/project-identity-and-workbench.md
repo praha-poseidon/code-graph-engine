@@ -26,24 +26,13 @@ Registered REST file operations can pass `repositoryId` and optionally
 `canonicalRepository` and `graphScope` for integrations. Direct GraphDelta import
 and project-scoped queries use `graphScope` as their existing `projectName`.
 
-## Existing data (non-destructive upgrade)
+## New identity only
 
-Startup backfills missing identity rows and records the old name as `legacyScope`.
-It does **not** rewrite/delete existing graph nodes, relationships or task history.
-An old short-name graph is retained as a legacy snapshot; future tasks write into
-the new UUID scope. Reanalysis is required to create the newly isolated graph.
-Both snapshots remain queryable by their respective project scopes. Repository
-details explicitly show the old scope and the reanalysis notice. The graph overview
-may contain both until legacy snapshots are deliberately retired.
-
-If two existing registrations normalize to the same repository key, startup fails
-with the repository ID rather than guessing which credentials/tasks to keep.
-Resolve those duplicate registrations before restarting. Backfilling is idempotent
-and handles concurrent workers racing to create the same identity row.
-
-Already-collided short-name graphs cannot be reliably split by changing IDs: rerun
-each repository from source. Do not claim that this upgrade repairs historical
-collisions or migrates every graph backend in place.
+Historical short-name identities are not supported. There is no startup backfill,
+legacy identity field, display-name fallback, or migration notice. Registrations
+must have an identity created with the current registration flow. Missing identity
+rows are rejected, never silently mapped to a display name. Removing compatibility
+code does not delete existing database records or task history.
 
 The development application currently uses an in-memory graph backend. SQL task
 history survives restarts; graph data requires an export before a development
@@ -66,7 +55,7 @@ parser/storage DTO cannot be reconstructed by the UI.
 ## Verification scope
 
 Tests cover canonical aliases, same-name repositories in different groups,
-transactional duplicate rollback, stable IDs after edits, idempotent legacy mapping,
+transactional duplicate rollback, stable IDs after edits, rejection of missing identities,
 registered file-operation scopes, and stored-node property readback. The real Java
 CLI fixture exercises independent project/branch scopes, repeat application and
 deletion isolation through Engine memory storage. Other language CLIs and production

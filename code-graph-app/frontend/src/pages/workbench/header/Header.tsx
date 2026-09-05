@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import McpButton from './McpButton'
 import { Bot, ChevronDown, CircleHelp, Keyboard, Loader2, Search, Settings } from 'lucide-react'
 import { nodeDisplayName } from '../../../api/graphMapper'
 import type { WorkbenchController } from '../state/useWorkbenchState'
@@ -109,6 +110,7 @@ export default function WorkbenchHeader({ controller }: { controller: WorkbenchC
           <span>{controller.graphData.nodes.length} nodes</span>
           <span>{controller.graphData.edges.length} edges</span>
         </div>
+        <McpButton />
         <button
           onClick={() => controller.setMode('settings')}
           title="配置中心"

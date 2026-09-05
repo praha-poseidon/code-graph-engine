@@ -17,8 +17,8 @@ class RepositoryIdentityTest {
             .isInstanceOf(IllegalArgumentException.class);
     }
     @Test void scopeIsStableAcrossTasksAndDifferentAcrossBranchesAndProjects() {
-        var a = new RepositoryIdentity("uuid-a", "key", "github.com/a/demo", null);
-        var b = new RepositoryIdentity("uuid-b", "key2", "github.com/b/demo", null);
+        var a = new RepositoryIdentity("uuid-a", "key", "github.com/a/demo");
+        var b = new RepositoryIdentity("uuid-b", "key2", "github.com/b/demo");
         assertThat(a.graphScope("main")).isEqualTo(a.graphScope("main"))
             .isNotEqualTo(a.graphScope("feature"))
             .isNotEqualTo(b.graphScope("main"));

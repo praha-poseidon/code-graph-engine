@@ -7,7 +7,7 @@ import java.util.HexFormat;
 import java.util.Locale;
 
 /** Stable platform identity, separate from the repository's display name and transport. */
-public record RepositoryIdentity(String projectId, String repositoryKey, String canonicalRepository, String legacyScope) {
+public record RepositoryIdentity(String projectId, String repositoryKey, String canonicalRepository) {
     public String graphScope(String branch) {
         // A new task/checkout must not change node IDs; different branches must not overwrite them.
         return "project:" + projectId + ":branch:" + hash(branch == null ? "" : branch.trim());

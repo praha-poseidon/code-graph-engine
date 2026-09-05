@@ -62,7 +62,7 @@ class AnalysisTaskWorkerTest {
 
         when(repositoryStore.findById(7L)).thenReturn(Optional.of(repository));
         when(repositoryStore.decrypted(repository)).thenReturn(repository);
-        when(repositoryStore.identity(7L)).thenReturn(new com.poseidon.codegraph.app.config.RepositoryIdentity("project-test", "key", "example/demo", null));
+        when(repositoryStore.identity(7L)).thenReturn(new com.poseidon.codegraph.app.config.RepositoryIdentity("project-test", "key", "example/demo"));
         when(workspace.cloneRepository("task-1", repository)).thenReturn(checkout);
         when(updateService.openSession("go")).thenReturn(session);
         when(taskStore.isOwnedAndRunning("task-1", "worker-test")).thenReturn(true);
@@ -100,7 +100,7 @@ class AnalysisTaskWorkerTest {
 
         when(repositoryStore.findById(7L)).thenReturn(Optional.of(repository));
         when(repositoryStore.decrypted(repository)).thenReturn(repository);
-        when(repositoryStore.identity(7L)).thenReturn(new com.poseidon.codegraph.app.config.RepositoryIdentity("project-test", "key", "example/demo", null));
+        when(repositoryStore.identity(7L)).thenReturn(new com.poseidon.codegraph.app.config.RepositoryIdentity("project-test", "key", "example/demo"));
         when(workspace.cloneRepository("task-2", repository)).thenReturn(checkout);
         when(updateService.openSession("go")).thenReturn(session);
         when(taskStore.isOwnedAndRunning("task-2", "worker-test")).thenReturn(true);
@@ -137,7 +137,7 @@ class AnalysisTaskWorkerTest {
 
         when(repositoryStore.findById(7L)).thenReturn(Optional.of(repository));
         when(repositoryStore.decrypted(repository)).thenReturn(repository);
-        when(repositoryStore.identity(7L)).thenReturn(new com.poseidon.codegraph.app.config.RepositoryIdentity("project-test", "key", "example/demo", null));
+        when(repositoryStore.identity(7L)).thenReturn(new com.poseidon.codegraph.app.config.RepositoryIdentity("project-test", "key", "example/demo"));
         when(workspace.cloneRepository("task-3", repository)).thenReturn(checkout);
         when(updateService.openSession("go")).thenReturn(session);
         when(taskStore.isOwnedAndRunning("task-3", "worker-test")).thenReturn(true);

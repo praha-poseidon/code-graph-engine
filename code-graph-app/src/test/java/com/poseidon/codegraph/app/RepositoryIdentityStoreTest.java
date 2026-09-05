@@ -33,16 +33,13 @@ class RepositoryIdentityStoreTest {
         assertThat(store.findById(a.id()).orElseThrow().gitBranch()).isEqualTo("release");
     }
 
-    @Test void oldConfigurationsAreBackfilledWithoutRenamingOrDeletingTheirGraphScope() {
+    @Test void missingIdentityIsRejectedRatherThanFallingBackToDisplayName() {
         var old = store.create(request("https://github.com/legacy/old.git", "main"));
         jdbc.update("DELETE FROM repository_identity WHERE repository_id = ?", old.id());
         jdbc.update("UPDATE repository_config SET name = 'old' WHERE id = ?", old.id());
-        store.backfillIdentities();
-        var identity = store.identity(old.id());
-        assertThat(identity.legacyScope()).isEqualTo("old");
+        assertThatThrownBy(() -> store.identity(old.id()))
+            .isInstanceOf(org.springframework.dao.EmptyResultDataAccessException.class);
         assertThat(store.findById(old.id()).orElseThrow().name()).isEqualTo("old");
-        store.backfillIdentities();
-        assertThat(store.identity(old.id()).projectId()).isEqualTo(identity.projectId());
         store.delete(old.id());
     }
 

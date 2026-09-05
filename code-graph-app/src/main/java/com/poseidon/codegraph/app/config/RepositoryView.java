@@ -21,6 +21,5 @@ public record RepositoryView(
         String latestTaskId,
         String projectId,
         String canonicalRepository,
-        String graphScope,
-        String legacyScope) {
+        String graphScope) {
 }

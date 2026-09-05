@@ -17,6 +17,16 @@
 
   <dependencies>
     <dependency>
+      <groupId>io.modelcontextprotocol.sdk</groupId>
+      <artifactId>mcp-core</artifactId>
+      <version>1.1.4</version>
+    </dependency>
+    <dependency>
+      <groupId>io.modelcontextprotocol.sdk</groupId>
+      <artifactId>mcp-json-jackson2</artifactId>
+      <version>1.1.4</version>
+    </dependency>
+    <dependency>
       <groupId>com.poseidon</groupId>
       <artifactId>code-graph-spring-boot-starter</artifactId>
       <version>${project.version}</version>

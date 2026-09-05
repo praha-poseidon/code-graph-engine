@@ -37,7 +37,7 @@ class CodeGraphControllerTest {
         org.mockito.Mockito.when(repository.id()).thenReturn(7L);
         org.mockito.Mockito.when(repository.gitRepoUrl()).thenReturn("https://github.com/team/demo.git");
         org.mockito.Mockito.when(repository.gitBranch()).thenReturn("main");
-        var identity = new com.poseidon.codegraph.app.config.RepositoryIdentity("uuid", "key", "github.com/team/demo", null);
+        var identity = new com.poseidon.codegraph.app.config.RepositoryIdentity("uuid", "key", "github.com/team/demo");
         org.mockito.Mockito.when(repositories.findById(7L)).thenReturn(java.util.Optional.of(repository));
         org.mockito.Mockito.when(repositories.identity(7L)).thenReturn(identity);
         var request = request();

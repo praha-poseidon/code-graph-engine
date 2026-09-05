@@ -9,6 +9,10 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     proxy: {
+      '/mcp': {
+        target: 'http://127.0.0.1:8084',
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://127.0.0.1:8084',
         changeOrigin: true,

@@ -23,6 +23,10 @@ spring:
         size: ${CODEGRAPH_SCHEDULER_POOL_SIZE:2}
 
 code-graph:
+  mcp:
+    enabled: ${CODEGRAPH_MCP_ENABLED:true}
+    public-url: ${CODEGRAPH_MCP_PUBLIC_URL:}
+    token: ${CODEGRAPH_MCP_TOKEN:}
   storage:
     type: ${CODEGRAPH_STORAGE_TYPE:memory}
   workspace-root: ${CODEGRAPH_WORKSPACE_ROOT:${java.io.tmpdir}/codegraph-workspaces}

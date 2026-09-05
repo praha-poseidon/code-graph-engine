@@ -10,7 +10,6 @@ interface Project {
   projectId?: string
   canonicalRepository?: string
   graphScope?: string
-  legacyScope?: string | null
   id: number
   name: string
   gitRepoUrl: string
@@ -396,7 +395,6 @@ function RepositoryCard({ project, onAnalyze, onEdit, onDelete, onOpenTasks }: {
             <p className="mt-1 break-all font-mono">{project.projectId}</p>
             <p className="mt-1 break-all">{project.canonicalRepository}</p>
             <p className="mt-1 break-all font-mono">{project.graphScope}</p>
-            {project.legacyScope && <p className="mt-2 text-amber-300">旧图谱标识：{project.legacyScope}。旧数据保留，新任务使用独立标识；请重新分析生成新版图谱。</p>}
           </details>}
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-400">
             <span>分支：{project.gitBranch || '默认分支'}</span>

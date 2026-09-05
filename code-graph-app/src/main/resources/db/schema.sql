@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS repository_identity (
     project_id VARCHAR(36) NOT NULL UNIQUE,
     repository_key VARCHAR(64) NOT NULL UNIQUE,
     canonical_repository VARCHAR(2048) NOT NULL,
-    legacy_scope VARCHAR(255),
     FOREIGN KEY (repository_id) REFERENCES repository_config(id) ON DELETE CASCADE
 );
 
