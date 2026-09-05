@@ -1,0 +1,210 @@
+name: Publish language tool bundles
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Bundle release version, for example v0.1.0
+        required: true
+        default: v0.1.0
+  push:
+    tags:
+      - tools-v*
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.language }} bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: java
+            parser_repo: praha-poseidon/code-graph-parser-java
+            extractor_repo: praha-poseidon/static-extract-java
+            parser_dir: code-graph-parser-java
+            extractor_dir: static-extract-java
+            parser_ref: master
+            extractor_ref: main
+            jvm: true
+          - language: go
+            parser_repo: praha-poseidon/code-graph-parser-go
+            extractor_repo: praha-poseidon/static-extract-go
+            parser_dir: code-graph-parser-go
+            extractor_dir: static-extract-go
+            parser_ref: main
+            extractor_ref: main
+            go: true
+          - language: javascript
+            parser_repo: praha-poseidon/code-graph-parser-js
+            extractor_repo: praha-poseidon/static-extract-js
+            parser_dir: code-graph-parser-js
+            extractor_dir: static-extract-js
+            parser_ref: master
+            extractor_ref: main
+            node: true
+          - language: python
+            parser_repo: praha-poseidon/code-graph-parser-python
+            extractor_repo: praha-poseidon/static-extract-python
+            parser_dir: code-graph-parser-python
+            extractor_dir: static-extract-python
+            parser_ref: main
+            extractor_ref: main
+            python: true
+          - language: php
+            parser_repo: praha-poseidon/code-graph-parser-php
+            extractor_repo: praha-poseidon/static-extract-php
+            parser_dir: code-graph-parser-php
+            extractor_dir: static-extract-php
+            parser_ref: main
+            extractor_ref: main
+            php: true
+          - language: kotlin
+            parser_repo: praha-poseidon/code-graph-parser-kotlin
+            extractor_repo: praha-poseidon/static-extract-kotlin
+            parser_dir: code-graph-parser-kotlin
+            extractor_dir: static-extract-kotlin
+            parser_ref: main
+            extractor_ref: main
+            jvm: true
+          - language: swift
+            parser_repo: praha-poseidon/code-graph-parser-swift
+            extractor_repo: praha-poseidon/static-extract-swift
+            parser_dir: code-graph-parser-swift
+            extractor_dir: static-extract-swift
+            parser_ref: main
+            extractor_ref: main
+            swift: true
+
+    steps:
+      - name: Check out engine
+        uses: actions/checkout@v4
+
+      - name: Check out parser source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.parser_repo }}
+          ref: ${{ matrix.parser_ref }}
+          path: bundle-workspace/${{ matrix.parser_dir }}
+
+      - name: Check out static-extract source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.extractor_repo }}
+          ref: ${{ matrix.extractor_ref }}
+          path: bundle-workspace/${{ matrix.extractor_dir }}
+
+      - name: Check out shared SER specification
+        if: matrix.language == 'java' || matrix.language == 'javascript'
+        uses: actions/checkout@v4
+        with:
+          repository: praha-poseidon/static-extract-spec
+          ref: main
+          path: bundle-workspace/static-extract-spec
+
+      - name: Set up Java
+        if: matrix.jvm == true
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Set up Go
+        if: matrix.go == true
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.23.12'
+
+      - name: Set up Node.js
+        if: matrix.node == true
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.19.0'
+
+      - name: Set up Python
+        if: matrix.python == true
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up PHP
+        if: matrix.php == true
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer:v2
+
+      - name: Set up Swift
+        if: matrix.swift == true
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.3'
+
+      - name: Assemble one-language package
+        env:
+          VERSION_INPUT: ${{ inputs.version }}
+          LANGUAGE: ${{ matrix.language }}
+          PARSER_DIR: ${{ matrix.parser_dir }}
+          EXTRACTOR_DIR: ${{ matrix.extractor_dir }}
+        run: |
+          set -euo pipefail
+          version="$VERSION_INPUT"
+          if [[ -z "$version" ]]; then version="${GITHUB_REF_NAME#tools-}"; fi
+          workspace="$GITHUB_WORKSPACE/bundle-workspace"
+          parser_dir="$workspace/$PARSER_DIR"
+          extractor_dir="$workspace/$EXTRACTOR_DIR"
+
+          case "$LANGUAGE" in
+            java)
+              (cd "$extractor_dir" && ./packaging/cli/build-linux-x64.sh "$version")
+              (cd "$parser_dir" && ./packaging/build-linux-x64.sh "$version")
+              ;;
+            go|javascript|python|php|kotlin|swift)
+              (cd "$extractor_dir" && ./packaging/build-linux-x64.sh "$version")
+              (cd "$parser_dir" && ./packaging/build-linux-x64.sh "$version")
+              ;;
+            *) echo "Unsupported language: $LANGUAGE" >&2; exit 2 ;;
+          esac
+
+          parser_archive="$(find "$parser_dir" -type f -path '*/dist/parser-*.tar.gz' -o -type f -path '*/.build/release-package/parser-*.tar.gz' | head -n 1)"
+          extractor_archive="$(find "$extractor_dir" -type f -path '*/dist/extract-*.tar.gz' -o -type f -path '*/.build/release-package/extract-*.tar.gz' | head -n 1)"
+          test -n "$parser_archive"
+          test -n "$extractor_archive"
+          ./packaging/build-language-bundle.sh "$LANGUAGE" "$version" "$parser_archive" "$extractor_archive" "$RUNNER_TEMP/out"
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codegraph-tools-${{ matrix.language }}
+          path: |
+            ${{ runner.temp }}/out/*.tar.gz
+            ${{ runner.temp }}/out/*.sha256
+          if-no-files-found: error
+
+  release:
+    name: Publish bundles
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download bundle artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: codegraph-tools-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_INPUT: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="$VERSION_INPUT"
+          if [[ -z "$version" ]]; then version="${GITHUB_REF_NAME#tools-}"; fi
+          test -n "$version"
+          gh release create "$version" dist/* --repo "$GITHUB_REPOSITORY" --generate-notes --title "Language tools $version"

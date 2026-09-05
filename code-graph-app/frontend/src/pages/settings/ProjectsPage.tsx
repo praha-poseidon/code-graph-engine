@@ -39,8 +39,8 @@ type LanguageToolPackage = {
 const LANGUAGE_TOOL_PACKAGES: Record<string, LanguageToolPackage> = {
   java: toolPackage('java'),
   go: toolPackage('go'),
-  javascript: toolPackage('js'),
-  typescript: toolPackage('js'),
+  javascript: toolPackage('javascript'),
+  typescript: toolPackage('javascript'),
   python: toolPackage('python'),
   php: toolPackage('php'),
   kotlin: toolPackage('kotlin'),
@@ -474,9 +474,8 @@ function formatBytes(size: number) {
 }
 
 function toolPackage(packageLanguage: string): LanguageToolPackage {
-  const cli = `extract-${packageLanguage}`
   return {
-    downloadUrl: `https://github.com/praha-poseidon/static-extract-${packageLanguage}/releases/latest/download/${cli}-linux-x64.tar.gz`,
+    downloadUrl: `https://github.com/praha-poseidon/code-graph-engine/releases/latest/download/codegraph-tools-${packageLanguage}-linux-x64.tar.gz`,
   }
 }
 
