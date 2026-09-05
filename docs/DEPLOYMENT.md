@@ -16,9 +16,18 @@ docker compose ps
 Open `http://localhost:8084/workbench`.
 
 Parser CLIs are mounted from `CODEGRAPH_PARSER_HOME` into `/opt/codegraph/parsers`.
-Only languages listed in `CODEGRAPH_PARSER_PROCESS_LANGUAGES` can be analyzed. A Go parser using
-`--stdio-stream` is kept alive for the lifetime of one analysis task, while files are still applied
-sequentially.
+The image does not claim that every language CLI is installed: keep
+`CODEGRAPH_PARSER_PROCESS_LANGUAGES` empty until the matching language package has been unpacked.
+Then enable only that language and point its command at the mounted executable, for example:
+
+```dotenv
+CODEGRAPH_PARSER_PROCESS_LANGUAGES=java
+CODEGRAPH_PARSER_JAVA_COMMAND=/opt/codegraph/parsers/bin/parser-java --stdio-stream
+```
+
+A Go parser using `--stdio-stream` is kept alive for the lifetime of one analysis task, while files
+are still applied sequentially. The same task-scoped process boundary is used for other streaming
+parsers; one-shot parsers are started and released per request.
 
 ## Data
 

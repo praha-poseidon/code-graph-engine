@@ -141,9 +141,9 @@ curl -X POST http://localhost:8084/api/code-graph/files/nodes \
   }'
 ```
 
-The app currently returns whether the write succeeded. During local verification, parsing details are visible in logs. A small debug/query API is planned so users can inspect graph data directly after parsing.
+The app returns whether the write succeeded. During local verification, parsing details are visible in logs. When memory storage is enabled, the debug/query API below exposes the stored graph directly after parsing.
 
-当前 App 会返回写入是否成功。做本地验证时，解析出的节点、关系和端点数量可以从日志中看到。memory storage 模式下也提供了轻量调试查询 API，让用户在解析后直接查看图数据。
+当前 App 会返回写入是否成功。做本地验证时，解析出的节点、关系和端点数量可以从日志中看到。使用 memory storage 时，还可以通过下面的调试查询 API 直接查看解析后的图数据。
 
 Inspect parsed data when using memory storage:
 

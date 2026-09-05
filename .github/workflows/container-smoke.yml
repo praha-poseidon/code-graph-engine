@@ -1,0 +1,75 @@
+name: Container smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/container-smoke.yml'
+      - 'Dockerfile'
+      - 'compose.yml'
+      - '.dockerignore'
+      - '.env.example'
+      - 'pom.xml'
+      - 'code-graph-app/**'
+      - 'code-graph-core/**'
+      - 'code-graph-model/**'
+      - 'code-graph-parser-process/**'
+      - 'code-graph-spring-boot-starter/**'
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/container-smoke.yml'
+      - 'Dockerfile'
+      - 'compose.yml'
+      - '.dockerignore'
+      - '.env.example'
+      - 'pom.xml'
+      - 'code-graph-app/**'
+      - 'code-graph-core/**'
+      - 'code-graph-model/**'
+      - 'code-graph-parser-process/**'
+      - 'code-graph-spring-boot-starter/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-healthcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate compose configuration
+        env:
+          MYSQL_CODEGRAPH_PASSWORD: smoke-codegraph-password
+          MYSQL_ROOT_PASSWORD: smoke-root-password
+          NEO4J_PASSWORD: smoke-neo4j-password
+          CODEGRAPH_MASTER_KEY: smoke-master-key
+        run: docker compose config --quiet
+
+      - name: Build CentOS 8.2 workbench image
+        run: docker build --progress=plain --tag codegraph/workbench:ci .
+
+      - name: Start workbench and check health
+        run: |
+          docker run --detach \
+            --name codegraph-workbench-ci \
+            --publish 18084:8084 \
+            --env CODEGRAPH_MASTER_KEY=smoke-master-key \
+            codegraph/workbench:ci
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18084/api/code-graph/health-check; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs codegraph-workbench-ci
+          exit 1
+
+      - name: Cleanup
+        if: always()
+        run: docker rm --force codegraph-workbench-ci 2>/dev/null || true
