@@ -53,12 +53,20 @@ jobs:
         run: docker build --progress=plain --tag codegraph/workbench:ci .
 
       - name: Start workbench and check health
+        env:
+          CODEGRAPH_VERSION: ci
+          CODEGRAPH_PORT: '18084'
+          MYSQL_PORT: '13306'
+          NEO4J_HTTP_PORT: '17474'
+          NEO4J_BOLT_PORT: '17687'
+          QDRANT_HTTP_PORT: '16333'
+          QDRANT_GRPC_PORT: '16334'
+          MYSQL_CODEGRAPH_PASSWORD: smoke-codegraph-password
+          MYSQL_ROOT_PASSWORD: smoke-root-password
+          NEO4J_PASSWORD: smoke-neo4j-password
+          CODEGRAPH_MASTER_KEY: smoke-master-key
         run: |
-          docker run --detach \
-            --name codegraph-workbench-ci \
-            --publish 18084:8084 \
-            --env CODEGRAPH_MASTER_KEY=smoke-master-key \
-            codegraph/workbench:ci
+          docker compose up --detach --wait
 
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:18084/api/code-graph/health-check; then
@@ -67,9 +75,22 @@ jobs:
             sleep 2
           done
 
-          docker logs codegraph-workbench-ci
+          docker compose ps
+          docker compose logs --no-color app mysql neo4j qdrant
           exit 1
 
       - name: Cleanup
         if: always()
-        run: docker rm --force codegraph-workbench-ci 2>/dev/null || true
+        env:
+          CODEGRAPH_VERSION: ci
+          CODEGRAPH_PORT: '18084'
+          MYSQL_PORT: '13306'
+          NEO4J_HTTP_PORT: '17474'
+          NEO4J_BOLT_PORT: '17687'
+          QDRANT_HTTP_PORT: '16333'
+          QDRANT_GRPC_PORT: '16334'
+          MYSQL_CODEGRAPH_PASSWORD: smoke-codegraph-password
+          MYSQL_ROOT_PASSWORD: smoke-root-password
+          NEO4J_PASSWORD: smoke-neo4j-password
+          CODEGRAPH_MASTER_KEY: smoke-master-key
+        run: docker compose down --volumes --remove-orphans

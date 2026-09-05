@@ -190,8 +190,8 @@ class AnalysisTaskStoreTest {
     private void insertRepository(long id, String name) {
         jdbc.update("""
             INSERT INTO repository_config
-                (id, name, git_repo_url, git_branch, languages, auth_type, status)
-            VALUES (?, ?, ?, 'main', 'go', 'NONE', 'IDLE')
-            """, id, name, "https://example.test/" + name + ".git");
+                (id, name, git_repo_url, git_repo_url_hash, git_branch, languages, auth_type, status)
+            VALUES (?, ?, ?, ?, 'main', 'go', 'NONE', 'IDLE')
+            """, id, name, "https://example.test/" + name + ".git", null);
     }
 }

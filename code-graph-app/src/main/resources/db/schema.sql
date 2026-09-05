@@ -2,6 +2,9 @@ CREATE TABLE IF NOT EXISTS repository_config (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     git_repo_url VARCHAR(2048) NOT NULL,
+    -- Keep the full display/clone URL, but index a fixed-width digest so MySQL
+    -- utf8mb4 never exceeds its 3072-byte index-key limit.
+    git_repo_url_hash CHAR(64) NULL,
     git_branch VARCHAR(255) NOT NULL,
     languages VARCHAR(512) NOT NULL,
     auth_type VARCHAR(32) NOT NULL,
@@ -13,7 +16,7 @@ CREATE TABLE IF NOT EXISTS repository_config (
     last_analyzed_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uk_repository_config_url UNIQUE (git_repo_url)
+    CONSTRAINT uk_repository_config_url UNIQUE (git_repo_url_hash)
 );
 
 CREATE TABLE IF NOT EXISTS repository_identity (

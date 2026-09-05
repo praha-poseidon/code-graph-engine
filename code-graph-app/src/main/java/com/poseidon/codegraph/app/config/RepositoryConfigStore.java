@@ -57,14 +57,15 @@ public class RepositoryConfigStore {
     public RepositoryConfig create(RepositoryRequest request) {
         validate(request);
         String url = request.gitRepoUrl().trim();
+        String urlHash = RepositoryIdentity.hash(RepositoryIdentity.canonical(url));
         String auth = authType(request);
         jdbc.update("""
             INSERT INTO repository_config
-                (name, git_repo_url, git_branch, languages, auth_type, access_token,
+                (name, git_repo_url, git_repo_url_hash, git_branch, languages, auth_type, access_token,
                  ssh_private_key, ssh_passphrase, endpoint_rule_sources, status, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'IDLE', CURRENT_TIMESTAMP)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'IDLE', CURRENT_TIMESTAMP)
             """,
-            inferName(url), url, branch(request), writeList(languages(request)), auth,
+            inferName(url), url, urlHash, branch(request), writeList(languages(request)), auth,
             "ACCESS_TOKEN".equals(auth) ? secretCodec.encrypt(request.accessToken()) : null,
             "SSH".equals(auth) ? secretCodec.encrypt(request.sshPrivateKey()) : null,
             "SSH".equals(auth) ? secretCodec.encrypt(request.sshPassphrase()) : null,
@@ -91,17 +92,18 @@ public class RepositoryConfigStore {
         String passphrase = "SSH".equals(auth)
             ? encryptedOrExisting(request.sshPassphrase(), existing.sshPassphrase()) : null;
         String url = request.gitRepoUrl().trim();
+        String urlHash = RepositoryIdentity.hash(RepositoryIdentity.canonical(url));
         String canonical = RepositoryIdentity.canonical(url);
         jdbc.update("UPDATE repository_identity SET repository_key = ?, canonical_repository = ? WHERE repository_id = ?",
             RepositoryIdentity.hash(canonical), canonical, id);
         jdbc.update("""
             UPDATE repository_config
-               SET name = ?, git_repo_url = ?, git_branch = ?, languages = ?, auth_type = ?,
+               SET name = ?, git_repo_url = ?, git_repo_url_hash = ?, git_branch = ?, languages = ?, auth_type = ?,
                    access_token = ?, ssh_private_key = ?, ssh_passphrase = ?, endpoint_rule_sources = ?,
                    status = 'IDLE', updated_at = CURRENT_TIMESTAMP
              WHERE id = ?
             """,
-            inferName(url), url, branch(request), writeList(languages(request)), auth,
+            inferName(url), url, urlHash, branch(request), writeList(languages(request)), auth,
             accessToken, sshKey, passphrase, writeList(safeList(request.endpointRuleSources())), id);
         return findById(id).orElseThrow();
     }
